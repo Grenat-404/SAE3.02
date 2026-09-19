@@ -7,17 +7,24 @@ class Simulation:
         self.vehicules = []
         self.routes = []
 
+        # Routes
         route_horizontale = Route(0, 250, 800, 120)
         route_verticale = Route(340, 0, 120, 600)
 
         self.routes.append(route_horizontale)
         self.routes.append(route_verticale)
 
-        voiture1 = Vehicule(100, 280, 2)
-        voiture2 = Vehicule(200, 320, 1)
+        # Véhicules
+        voiture1 = Vehicule(50, 280, 2, "droite")
+        voiture2 = Vehicule(700, 320, 1, "gauche")
+
+        voiture3 = Vehicule(370, 50, 2, "bas")
+        voiture4 = Vehicule(410, 500, 1, "haut")
 
         self.vehicules.append(voiture1)
         self.vehicules.append(voiture2)
+        self.vehicules.append(voiture3)
+        self.vehicules.append(voiture4)
 
     def avancer(self):
         for vehicule in self.vehicules:

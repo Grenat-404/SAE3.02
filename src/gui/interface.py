@@ -38,9 +38,19 @@ class Interface(QWidget):
         painter.setBrush(Qt.GlobalColor.blue)
 
         for vehicule in self.simulation.vehicules:
-            painter.drawRect(
-                vehicule.x,
-                vehicule.y,
-                30,
-                20
-            )
+
+            if vehicule.direction == "haut" or vehicule.direction == "bas":
+                painter.drawRect(
+                    vehicule.x,
+                    vehicule.y,
+                    20,
+                    30
+                )
+
+            else:
+                painter.drawRect(
+                    vehicule.x,
+                    vehicule.y,
+                    30,
+                    20
+                )
