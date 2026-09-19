@@ -6,3 +6,6 @@ class Vehicule:
 
     def avancer(self):
         self.x = self.x + self.vitesse
+
+        if self.x > 800:
+            self.x = -30

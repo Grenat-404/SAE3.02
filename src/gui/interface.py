@@ -23,17 +23,16 @@ class Interface(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
 
-        # Route
-        route = self.simulation.route
-
+        # Routes
         painter.setBrush(Qt.GlobalColor.darkGray)
 
-        painter.drawRect(
-            route.x,
-            route.y,
-            route.largeur,
-            route.hauteur
-        )
+        for route in self.simulation.routes:
+            painter.drawRect(
+                route.x,
+                route.y,
+                route.largeur,
+                route.hauteur
+            )
 
         # Véhicules
         painter.setBrush(Qt.GlobalColor.blue)
