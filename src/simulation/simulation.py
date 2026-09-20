@@ -1,5 +1,6 @@
 from src.model.vehicule import Vehicule
 from src.model.route import Route
+from src.model.intersection import Intersection
 
 
 class Simulation:
@@ -14,10 +15,12 @@ class Simulation:
         self.routes.append(route_horizontale)
         self.routes.append(route_verticale)
 
+        # Intersection
+        self.intersection = Intersection(340, 250, 120, 120)
+
         # Véhicules
         voiture1 = Vehicule(50, 280, 2, "droite")
         voiture2 = Vehicule(700, 320, 1, "gauche")
-
         voiture3 = Vehicule(370, 50, 2, "bas")
         voiture4 = Vehicule(410, 500, 1, "haut")
 
