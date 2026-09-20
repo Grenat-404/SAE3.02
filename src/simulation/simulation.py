@@ -1,6 +1,7 @@
 from src.model.vehicule import Vehicule
 from src.model.route import Route
 from src.model.intersection import Intersection
+from src.model.feu import Feu
 
 
 class Simulation:
@@ -18,6 +19,9 @@ class Simulation:
         # Intersection
         self.intersection = Intersection(340, 250, 120, 120)
 
+        # Feu
+        self.feu = Feu(310, 220, "rouge")
+
         # Véhicules
         voiture1 = Vehicule(50, 280, 2, "droite")
         voiture2 = Vehicule(700, 320, 1, "gauche")
@@ -32,3 +36,5 @@ class Simulation:
     def avancer(self):
         for vehicule in self.vehicules:
             vehicule.avancer()
+
+        self.feu.mettre_a_jour()

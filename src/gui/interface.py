@@ -34,6 +34,21 @@ class Interface(QWidget):
                 route.hauteur
             )
 
+        # Feu
+        feu = self.simulation.feu
+
+        if feu.etat == "rouge":
+            painter.setBrush(Qt.GlobalColor.red)
+        else:
+            painter.setBrush(Qt.GlobalColor.green)
+
+        painter.drawEllipse(
+            feu.x,
+            feu.y,
+            20,
+            20
+        )
+
         # Véhicules
         for vehicule in self.simulation.vehicules:
 
