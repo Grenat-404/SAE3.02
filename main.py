@@ -2,15 +2,17 @@ import sys
 
 from PyQt6.QtWidgets import QApplication
 
-from src.simulation.simulation import Simulation
-from src.gui.interface import Interface
+from src.interface.fenetre_principale import FenetrePrincipale
 
 
-app = QApplication(sys.argv)
+def main():
+    application = QApplication(sys.argv)
 
-simulation = Simulation()
+    fenetre = FenetrePrincipale()
+    fenetre.show()
 
-fenetre = Interface(simulation)
-fenetre.show()
+    sys.exit(application.exec())
 
-app.exec()
+
+if __name__ == "__main__":
+    main()

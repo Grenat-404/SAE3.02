@@ -1,13 +1,26 @@
 class Intersection:
-    def __init__(self, x, y, largeur, hauteur):
-        self.x = x
-        self.y = y
-        self.largeur = largeur
-        self.hauteur = hauteur
+    """Représente une intersection entre plusieurs routes."""
 
-    def contient(self, vehicule):
-        return (
-            self.x <= vehicule.x <= self.x + self.largeur
-            and
-            self.y <= vehicule.y <= self.y + self.hauteur
-        )
+    def __init__(
+        self,
+        identifiant,
+        position,
+        largeur,
+        hauteur
+    ):
+        self.__identifiant = identifiant
+        self.__position = position
+        self.__largeur = largeur
+        self.__hauteur = hauteur
+
+    def get_identifiant(self):
+        return self.__identifiant
+
+    def get_position(self):
+        return self.__position
+
+    def get_largeur(self):
+        return self.__largeur
+
+    def get_hauteur(self):
+        return self.__hauteur

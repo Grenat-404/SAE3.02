@@ -1,104 +1,338 @@
-from src.model.vehicule import Vehicule
-from src.model.route import Route
-from src.model.intersection import Intersection
+import time
+
 from src.model.feu import Feu
 
 
 class Simulation:
-    def __init__(self):
-        self.vehicules = []
-        self.routes = []
+    """Gère le fonctionnement général de la simulation."""
 
-        # Routes
-        route_horizontale = Route(0, 250, 800, 120)
-        route_verticale = Route(340, 0, 120, 600)
+    def __init__(self, carte):
+        self.__carte = carte
+        self.__vehicules = []
 
-        self.routes.append(route_horizontale)
-        self.routes.append(route_verticale)
+        self.__distance_minimale = 20
 
-        # Intersection
-        self.intersection = Intersection(340, 250, 120, 120)
+        self.__phase_feux = "nord_sud"
+        self.__duree_vert = 5
+        self.__duree_transition = 0.5
 
-        # Feux de la route horizontale
-        self.feu_droite = Feu(300, 230, "vert")
-        self.feu_gauche = Feu(480, 390, "vert")
+        self.__transition_feux = False
 
-        # Feux de la route verticale
-        self.feu_bas = Feu(320, 210, "rouge")
-        self.feu_haut = Feu(460, 390, "rouge")
+        self.__temps_phase = time.time()
+        self.__temps_transition = 0
 
-        # Liste des feux pour faciliter leur affichage
-        self.feux = []
+    def ajouter_vehicule(self, vehicule):
+        self.__vehicules.append(vehicule)
 
-        self.feux.append(self.feu_droite)
-        self.feux.append(self.feu_gauche)
-        self.feux.append(self.feu_bas)
-        self.feux.append(self.feu_haut)
+    def get_vehicules(self):
+        return self.__vehicules
 
-        # Véhicules
-        voiture1 = Vehicule(50, 280, 2, "droite")
-        voiture2 = Vehicule(700, 320, 1, "gauche")
-        voiture3 = Vehicule(370, 50, 2, "bas")
-        voiture4 = Vehicule(410, 500, 1, "haut")
+    def get_carte(self):
+        return self.__carte
 
-        self.vehicules.append(voiture1)
-        self.vehicules.append(voiture2)
-        self.vehicules.append(voiture3)
-        self.vehicules.append(voiture4)
+    def mettre_a_jour(self):
+        self.__mettre_a_jour_feux()
 
-    def avancer(self):
-        for vehicule in self.vehicules:
+        # On autorise d'abord les véhicules à avancer.
+        for vehicule in self.__vehicules:
+            vehicule.demarrer()
 
-            doit_s_arreter = False
+        # Vérification des feux.
+        for vehicule in self.__vehicules:
+            if self.__doit_s_arreter_au_feu(vehicule):
+                vehicule.arreter()
 
-            # Véhicule allant vers la droite
-            if vehicule.direction == "droite":
+        # Vérification des véhicules devant.
+        for vehicule in self.__vehicules:
+            if self.__vehicule_trop_proche(vehicule):
+                vehicule.arreter()
 
-                position_arret = self.intersection.x - 30
+        # Déplacement.
+        for vehicule in self.__vehicules:
+            vehicule.avancer()
+            self.__replacer_vehicule(vehicule)
 
-                if self.feu_droite.etat == "rouge":
-                    if vehicule.x <= position_arret:
-                        if vehicule.x + vehicule.vitesse >= position_arret:
-                            vehicule.x = position_arret
-                            doit_s_arreter = True
+    def __mettre_a_jour_feux(self):
+        maintenant = time.time()
 
-            # Véhicule allant vers la gauche
-            elif vehicule.direction == "gauche":
+        if not self.__transition_feux:
+            temps_ecoule = maintenant - self.__temps_phase
 
-                position_arret = self.intersection.x + self.intersection.largeur
+            if temps_ecoule >= self.__duree_vert:
+                self.__mettre_tous_les_feux_au_rouge()
 
-                if self.feu_gauche.etat == "rouge":
-                    if vehicule.x >= position_arret:
-                        if vehicule.x - vehicule.vitesse <= position_arret:
-                            vehicule.x = position_arret
-                            doit_s_arreter = True
+                self.__transition_feux = True
+                self.__temps_transition = maintenant
 
-            # Véhicule allant vers le bas
-            elif vehicule.direction == "bas":
+        else:
+            temps_transition = maintenant - self.__temps_transition
 
-                position_arret = self.intersection.y - 30
+            if (
+                temps_transition >= self.__duree_transition
+                and self.__intersection_est_libre()
+            ):
+                if self.__phase_feux == "nord_sud":
+                    self.__phase_feux = "est_ouest"
+                else:
+                    self.__phase_feux = "nord_sud"
 
-                if self.feu_bas.etat == "rouge":
-                    if vehicule.y <= position_arret:
-                        if vehicule.y + vehicule.vitesse >= position_arret:
-                            vehicule.y = position_arret
-                            doit_s_arreter = True
+                self.__appliquer_phase_feux()
 
-            # Véhicule allant vers le haut
-            elif vehicule.direction == "haut":
+                self.__transition_feux = False
+                self.__temps_phase = maintenant
 
-                position_arret = self.intersection.y + self.intersection.hauteur
+    def __mettre_tous_les_feux_au_rouge(self):
+        for feu in self.__carte.get_feux():
+            feu.passer_au_rouge()
 
-                if self.feu_haut.etat == "rouge":
-                    if vehicule.y >= position_arret:
-                        if vehicule.y - vehicule.vitesse <= position_arret:
-                            vehicule.y = position_arret
-                            doit_s_arreter = True
+    def __appliquer_phase_feux(self):
+        for feu in self.__carte.get_feux():
 
-            # Le véhicule avance seulement s'il ne doit pas s'arrêter
-            if not doit_s_arreter:
-                vehicule.avancer()
+            direction = feu.get_direction()
 
-        # Mise à jour des quatre feux
-        for feu in self.feux:
-            feu.mettre_a_jour()
+            if self.__phase_feux == "nord_sud":
+
+                if direction == "nord" or direction == "sud":
+                    feu.passer_au_vert()
+                else:
+                    feu.passer_au_rouge()
+
+            elif self.__phase_feux == "est_ouest":
+
+                if direction == "est" or direction == "ouest":
+                    feu.passer_au_vert()
+                else:
+                    feu.passer_au_rouge()
+
+    def __trouver_feu(self, direction):
+        for feu in self.__carte.get_feux():
+            if feu.get_direction() == direction:
+                return feu
+
+        return None
+
+    def __doit_s_arreter_au_feu(self, vehicule):
+        feu = self.__trouver_feu(
+            vehicule.get_direction()
+        )
+
+        if feu is None:
+            return False
+
+        if feu.get_etat() != Feu.ROUGE:
+            return False
+
+        intersections = self.__carte.get_intersections()
+
+        if len(intersections) == 0:
+            return False
+
+        intersection = intersections[0]
+
+        x_intersection = intersection.get_position().get_x()
+        y_intersection = intersection.get_position().get_y()
+
+        largeur_intersection = intersection.get_largeur()
+        hauteur_intersection = intersection.get_hauteur()
+
+        position = vehicule.get_position()
+
+        x = position.get_x()
+        y = position.get_y()
+
+        marge = 10
+
+        direction = vehicule.get_direction()
+
+        if direction == "est":
+            position_arret = (
+                x_intersection
+                - vehicule.get_largeur()
+                - marge
+            )
+
+            if (
+                x >= position_arret
+                and x < x_intersection
+            ):
+                return True
+
+        elif direction == "ouest":
+            position_arret = (
+                x_intersection
+                + largeur_intersection
+                + marge
+            )
+
+            if (
+                x <= position_arret
+                and x > x_intersection + largeur_intersection
+            ):
+                return True
+
+        elif direction == "sud":
+            position_arret = (
+                y_intersection
+                - vehicule.get_hauteur()
+                - marge
+            )
+
+            if (
+                y >= position_arret
+                and y < y_intersection
+            ):
+                return True
+
+        elif direction == "nord":
+            position_arret = (
+                y_intersection
+                + hauteur_intersection
+                + marge
+            )
+
+            if (
+                y <= position_arret
+                and y > y_intersection + hauteur_intersection
+            ):
+                return True
+
+        return False
+
+    def __vehicule_trop_proche(self, vehicule):
+        for autre in self.__vehicules:
+
+            if autre == vehicule:
+                continue
+
+            if autre.get_direction() != vehicule.get_direction():
+                continue
+
+            direction = vehicule.get_direction()
+
+            position = vehicule.get_position()
+            position_autre = autre.get_position()
+
+            if direction == "est":
+
+                if position.get_y() != position_autre.get_y():
+                    continue
+
+                if position_autre.get_x() > position.get_x():
+                    distance = (
+                        position_autre.get_x()
+                        - (
+                            position.get_x()
+                            + vehicule.get_largeur()
+                        )
+                    )
+
+                    if 0 <= distance < self.__distance_minimale:
+                        return True
+
+            elif direction == "ouest":
+
+                if position.get_y() != position_autre.get_y():
+                    continue
+
+                if position_autre.get_x() < position.get_x():
+                    distance = (
+                        position.get_x()
+                        - (
+                            position_autre.get_x()
+                            + autre.get_largeur()
+                        )
+                    )
+
+                    if 0 <= distance < self.__distance_minimale:
+                        return True
+
+            elif direction == "sud":
+
+                if position.get_x() != position_autre.get_x():
+                    continue
+
+                if position_autre.get_y() > position.get_y():
+                    distance = (
+                        position_autre.get_y()
+                        - (
+                            position.get_y()
+                            + vehicule.get_hauteur()
+                        )
+                    )
+
+                    if 0 <= distance < self.__distance_minimale:
+                        return True
+
+            elif direction == "nord":
+
+                if position.get_x() != position_autre.get_x():
+                    continue
+
+                if position_autre.get_y() < position.get_y():
+                    distance = (
+                        position.get_y()
+                        - (
+                            position_autre.get_y()
+                            + autre.get_hauteur()
+                        )
+                    )
+
+                    if 0 <= distance < self.__distance_minimale:
+                        return True
+
+        return False
+
+    def __intersection_est_libre(self):
+        intersections = self.__carte.get_intersections()
+
+        if len(intersections) == 0:
+            return True
+
+        intersection = intersections[0]
+
+        x1 = intersection.get_position().get_x()
+        y1 = intersection.get_position().get_y()
+
+        x2 = x1 + intersection.get_largeur()
+        y2 = y1 + intersection.get_hauteur()
+
+        for vehicule in self.__vehicules:
+
+            position = vehicule.get_position()
+
+            vx1 = position.get_x()
+            vy1 = position.get_y()
+
+            vx2 = vx1 + vehicule.get_largeur()
+            vy2 = vy1 + vehicule.get_hauteur()
+
+            if (
+                vx2 > x1
+                and vx1 < x2
+                and vy2 > y1
+                and vy1 < y2
+            ):
+                return False
+
+        return True
+
+    def __replacer_vehicule(self, vehicule):
+        position = vehicule.get_position()
+
+        x = position.get_x()
+        y = position.get_y()
+
+        largeur = self.__carte.get_largeur()
+        hauteur = self.__carte.get_hauteur()
+
+        if x > largeur:
+            position.set_x(-vehicule.get_largeur())
+
+        elif x < -vehicule.get_largeur():
+            position.set_x(largeur)
+
+        if y > hauteur:
+            position.set_y(-vehicule.get_hauteur())
+
+        elif y < -vehicule.get_hauteur():
+            position.set_y(hauteur)
