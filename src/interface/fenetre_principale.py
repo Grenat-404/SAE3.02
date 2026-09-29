@@ -6,12 +6,18 @@ from src.model.route import Route
 from src.model.intersection import Intersection
 from src.model.carte import Carte
 from src.model.vehicule import Vehicule
+from src.model.vehicule_prioritaire import VehiculePrioritaire
 from src.model.feu import Feu
 
 from src.simulation.simulation import Simulation
 
 from src.interface.vue_carrefour import VueCarrefour
 
+from src.reseau.serveur import Serveur
+from src.reseau.client import Client
+
+from src.model.urgence import Urgence
+from src.database.urgence_db import UrgenceDB
 
 class FenetrePrincipale(QMainWindow):
     """Fenêtre principale de la simulation."""
@@ -39,7 +45,20 @@ class FenetrePrincipale(QMainWindow):
             self.__vue
         )
 
+        # Réseau V2I
+        self.__serveur = Serveur()
+        self.__client = Client()
+
+        self.__serveur.demarrer()
+
+        self.__urgence_db = UrgenceDB()
+        self.__creer_urgences_demo()
+
         self.__creer_vehicules()
+
+        self.statusBar().showMessage(
+            "Serveur V2I actif sur 127.0.0.1:5000"
+        )
 
         self.__timer = QTimer(self)
 
@@ -128,14 +147,36 @@ class FenetrePrincipale(QMainWindow):
             Feu.ROUGE
         )
 
-        carte.ajouter_feu(feu_nord)
-        carte.ajouter_feu(feu_sud)
-        carte.ajouter_feu(feu_est)
-        carte.ajouter_feu(feu_ouest)
+        carte.ajouter_feu(
+            feu_nord
+        )
+
+        carte.ajouter_feu(
+            feu_sud
+        )
+
+        carte.ajouter_feu(
+            feu_est
+        )
+
+        carte.ajouter_feu(
+            feu_ouest
+        )
 
         return carte
 
     def __creer_vehicules(self):
+        # Récupération des urgences dans la base SQLite
+        accident = self.__urgence_db.get_urgence(1)
+
+        intervention_police = (
+            self.__urgence_db.get_urgence(2)
+        )
+
+        # --------------------------------------------------
+        # VEHICULES CLASSIQUES
+        # --------------------------------------------------
+
         vehicule1 = Vehicule(
             1,
             Position(250, 335),
@@ -143,9 +184,6 @@ class FenetrePrincipale(QMainWindow):
             "est"
         )
 
-        # Deuxième véhicule dans la même voie.
-        # Il est légèrement plus rapide afin de tester
-        # la distance minimale.
         vehicule2 = Vehicule(
             2,
             Position(100, 335),
@@ -169,14 +207,57 @@ class FenetrePrincipale(QMainWindow):
             hauteur=30
         )
 
-        vehicule5 = Vehicule(
+        # --------------------------------------------------
+        # VEHICULES PRIORITAIRES
+        # --------------------------------------------------
+
+        # Ambulance appartenant à l'accident grave.
+        # Priorité récupérée depuis SQLite.
+        ambulance = VehiculePrioritaire(
             5,
-            Position(530, 620),
+            Position(530, 700),
             2.5,
             "nord",
+            "ambulance",
+            accident.get_niveau_priorite(),
             largeur=20,
-            hauteur=30
+            hauteur=30,
+            urgence_id=accident.get_identifiant()
         )
+
+        # Pompier appartenant à la même urgence
+        # que l'ambulance.
+        pompier = VehiculePrioritaire(
+            6,
+            Position(50, 335),
+            2,
+            "est",
+            "pompier",
+            accident.get_niveau_priorite(),
+            largeur=30,
+            hauteur=20,
+            urgence_id=accident.get_identifiant()
+        )
+
+        # Véhicule de police appartenant
+        # à une autre urgence.
+        police = VehiculePrioritaire(
+            7,
+            Position(455, 20),
+            2,
+            "sud",
+            "police",
+            intervention_police.get_niveau_priorite(),
+            largeur=20,
+            hauteur=30,
+            urgence_id=(
+                intervention_police.get_identifiant()
+            )
+        )
+
+        # --------------------------------------------------
+        # AJOUT DES VEHICULES A LA SIMULATION
+        # --------------------------------------------------
 
         self.__simulation.ajouter_vehicule(
             vehicule1
@@ -195,11 +276,22 @@ class FenetrePrincipale(QMainWindow):
         )
 
         self.__simulation.ajouter_vehicule(
-            vehicule5
+            ambulance
         )
 
-        for vehicule in self.__simulation.get_vehicules():
+        self.__simulation.ajouter_vehicule(
+            pompier
+        )
 
+        self.__simulation.ajouter_vehicule(
+            police
+        )
+
+        # --------------------------------------------------
+        # AJOUT GRAPHIQUE DES VEHICULES
+        # --------------------------------------------------
+
+        for vehicule in self.__simulation.get_vehicules():
             self.__vue.ajouter_vehicule(
                 vehicule
             )
@@ -207,8 +299,101 @@ class FenetrePrincipale(QMainWindow):
     def __mettre_a_jour(self):
         self.__simulation.mettre_a_jour()
 
+        self.__envoyer_signalements_prioritaires()
+
+        self.__traiter_messages_reseau()
+
         self.__vue.mettre_a_jour_vehicules(
             self.__simulation.get_vehicules()
         )
 
         self.__vue.mettre_a_jour_feux()
+
+    def __envoyer_signalements_prioritaires(self):
+        vehicules = (
+            self.__simulation
+            .get_vehicules_prioritaires_a_signaler()
+        )
+
+        for vehicule in vehicules:
+
+            message = {
+                "type": "vehicule_prioritaire",
+                "id": vehicule.get_identifiant(),
+                "service": vehicule.get_type_service(),
+                "priorite": vehicule.get_niveau_priorite(),
+                "direction": vehicule.get_direction(),
+                "urgence_id": vehicule.get_urgence_id()
+            }
+
+            succes = self.__client.envoyer(
+                message
+            )
+
+            if succes:
+                vehicule.marquer_message_envoye()
+
+    def __traiter_messages_reseau(self):
+        messages = (
+            self.__serveur.recuperer_messages()
+        )
+
+        for message in messages:
+            texte = (
+                "V2I reçu : "
+                f"{message['service']} | "
+                f"priorité {message['priorite']} | "
+                f"direction {message['direction']}"
+            )
+
+            print(texte)
+
+            self.statusBar().showMessage(
+                texte,
+                5000
+            )
+
+            self.__simulation.traiter_message_prioritaire(
+                message
+            )
+
+    def __creer_urgences_demo(self):
+        accident = Urgence(
+            1,
+            "accident_grave",
+            3,
+            [
+                "ambulance",
+                "pompier"
+            ],
+            2
+        )
+
+        intervention_police = Urgence(
+            2,
+            "intervention_police",
+            2,
+            [
+                "police"
+            ],
+            1
+        )
+
+        self.__urgence_db.ajouter_urgence(
+            accident
+        )
+
+        self.__urgence_db.ajouter_urgence(
+            intervention_police
+        )
+
+    def closeEvent(self, event):
+        """Arrête proprement la simulation et le serveur."""
+
+        self.__timer.stop()
+
+        self.__serveur.arreter()
+
+        print("Application arrêtée proprement")
+
+        event.accept()

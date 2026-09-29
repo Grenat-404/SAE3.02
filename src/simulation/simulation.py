@@ -1,6 +1,7 @@
 import time
 
 from src.model.feu import Feu
+from src.model.vehicule_prioritaire import VehiculePrioritaire
 
 
 class Simulation:
@@ -10,8 +11,11 @@ class Simulation:
         self.__carte = carte
         self.__vehicules = []
 
+        # Circulation
         self.__distance_minimale = 20
+        self.__distance_detection_prioritaire = 150
 
+        # Cycle normal des feux
         self.__phase_feux = "nord_sud"
         self.__duree_vert = 5
         self.__duree_transition = 0.5
@@ -20,6 +24,21 @@ class Simulation:
 
         self.__temps_phase = time.time()
         self.__temps_transition = 0
+
+        # Gestion des véhicules prioritaires
+        self.__vehicule_prioritaire_actif = None
+        self.__direction_prioritaire = None
+        self.__etat_priorite = None
+        self.__temps_priorite = 0
+
+        self.__phase_avant_priorite = None
+
+        # V0.5 : plusieurs demandes
+        self.__demandes_prioritaires = []
+        self.__ordre_arrivee = 0
+        self.__demande_prioritaire_active = None
+
+        self.__phase_avant_priorite = None
 
     def ajouter_vehicule(self, vehicule):
         self.__vehicules.append(vehicule)
@@ -33,7 +52,7 @@ class Simulation:
     def mettre_a_jour(self):
         self.__mettre_a_jour_feux()
 
-        # On autorise d'abord les véhicules à avancer.
+        # Les véhicules peuvent normalement avancer.
         for vehicule in self.__vehicules:
             vehicule.demarrer()
 
@@ -52,34 +71,442 @@ class Simulation:
             vehicule.avancer()
             self.__replacer_vehicule(vehicule)
 
+    # --------------------------------------------------
+    # VEHICULES PRIORITAIRES
+    # --------------------------------------------------
+
+    def get_vehicules_prioritaires_a_signaler(self):
+        vehicules_a_signaler = []
+
+        for vehicule in self.__vehicules:
+
+            if not isinstance(
+                vehicule,
+                VehiculePrioritaire
+            ):
+                continue
+
+            if vehicule.message_deja_envoye():
+                continue
+
+            if self.__est_proche_intersection(
+                vehicule
+            ):
+                vehicules_a_signaler.append(
+                    vehicule
+                )
+
+        return vehicules_a_signaler
+
+    def traiter_message_prioritaire(self, message):
+        """Ajoute une demande de priorité reçue par V2I."""
+
+        if message.get("type") != "vehicule_prioritaire":
+            return
+
+        identifiant = message.get("id")
+
+        vehicule = self.__trouver_vehicule(
+            identifiant
+        )
+
+        if vehicule is None:
+            return
+
+        if not isinstance(
+                vehicule,
+                VehiculePrioritaire
+        ):
+            return
+
+        if self.__demande_existe(identifiant):
+            return
+
+        self.__ordre_arrivee += 1
+
+        demande = {
+            "id": identifiant,
+            "service": message.get("service"),
+            "priorite": message.get("priorite"),
+            "direction": message.get("direction"),
+            "urgence_id": message.get("urgence_id"),
+            "ordre_arrivee": self.__ordre_arrivee
+        }
+
+        self.__demandes_prioritaires.append(
+            demande
+        )
+
+        print(
+            "Demande ajoutée :",
+            demande["service"],
+            "- priorité",
+            demande["priorite"]
+        )
+
+        if self.__demande_prioritaire_active is None:
+            self.__activer_prochaine_priorite()
+
+        elif self.__etat_priorite == "securisation":
+            priorite_active = (
+                self.__demande_prioritaire_active[
+                    "priorite"
+                ]
+            )
+
+            if demande["priorite"] > priorite_active:
+                self.__demandes_prioritaires.append(
+                    self.__demande_prioritaire_active
+                )
+
+                self.__demande_prioritaire_active = None
+                self.__vehicule_prioritaire_actif = None
+
+                self.__activer_prochaine_priorite()
+
+    def __trouver_vehicule(self, identifiant):
+        for vehicule in self.__vehicules:
+
+            if (
+                vehicule.get_identifiant()
+                == identifiant
+            ):
+                return vehicule
+
+        return None
+
+    def __est_proche_intersection(self, vehicule):
+        intersections = (
+            self.__carte.get_intersections()
+        )
+
+        if len(intersections) == 0:
+            return False
+
+        intersection = intersections[0]
+
+        x_intersection = (
+            intersection.get_position().get_x()
+        )
+
+        y_intersection = (
+            intersection.get_position().get_y()
+        )
+
+        largeur_intersection = (
+            intersection.get_largeur()
+        )
+
+        hauteur_intersection = (
+            intersection.get_hauteur()
+        )
+
+        position = vehicule.get_position()
+
+        x = position.get_x()
+        y = position.get_y()
+
+        direction = vehicule.get_direction()
+
+        if direction == "est":
+
+            distance = (
+                x_intersection
+                - (
+                    x
+                    + vehicule.get_largeur()
+                )
+            )
+
+        elif direction == "ouest":
+
+            distance = (
+                x
+                - (
+                    x_intersection
+                    + largeur_intersection
+                )
+            )
+
+        elif direction == "sud":
+
+            distance = (
+                y_intersection
+                - (
+                    y
+                    + vehicule.get_hauteur()
+                )
+            )
+
+        elif direction == "nord":
+
+            distance = (
+                y
+                - (
+                    y_intersection
+                    + hauteur_intersection
+                )
+            )
+
+        else:
+            return False
+
+        return (
+            0
+            <= distance
+            <= self.__distance_detection_prioritaire
+        )
+
+    # --------------------------------------------------
+    # FEUX
+    # --------------------------------------------------
+
     def __mettre_a_jour_feux(self):
+
+        # Si une priorité est active,
+        # elle remplace temporairement le cycle normal.
+        if self.__vehicule_prioritaire_actif is not None:
+            self.__mettre_a_jour_priorite()
+            return
+
         maintenant = time.time()
 
         if not self.__transition_feux:
-            temps_ecoule = maintenant - self.__temps_phase
+
+            temps_ecoule = (
+                maintenant - self.__temps_phase
+            )
 
             if temps_ecoule >= self.__duree_vert:
+
                 self.__mettre_tous_les_feux_au_rouge()
 
                 self.__transition_feux = True
+
                 self.__temps_transition = maintenant
 
         else:
-            temps_transition = maintenant - self.__temps_transition
+
+            temps_transition = (
+                maintenant
+                - self.__temps_transition
+            )
 
             if (
-                temps_transition >= self.__duree_transition
+                temps_transition
+                >= self.__duree_transition
                 and self.__intersection_est_libre()
             ):
                 if self.__phase_feux == "nord_sud":
                     self.__phase_feux = "est_ouest"
+
                 else:
                     self.__phase_feux = "nord_sud"
 
                 self.__appliquer_phase_feux()
 
                 self.__transition_feux = False
+
                 self.__temps_phase = maintenant
+
+    def __mettre_a_jour_priorite(self):
+        maintenant = time.time()
+
+        # ------------------------------
+        # 1. Sécurisation du carrefour
+        # ------------------------------
+
+        if self.__etat_priorite == "securisation":
+
+            self.__mettre_tous_les_feux_au_rouge()
+
+            temps_ecoule = (
+                maintenant
+                - self.__temps_priorite
+            )
+
+            if (
+                temps_ecoule
+                >= self.__duree_transition
+                and self.__intersection_est_libre()
+            ):
+                self.__appliquer_feu_prioritaire()
+
+                self.__etat_priorite = "passage"
+
+                print(
+                    "Passage prioritaire autorisé :",
+                    self.__direction_prioritaire
+                )
+
+        # ------------------------------
+        # 2. Passage du véhicule
+        # ------------------------------
+
+        elif self.__etat_priorite == "passage":
+
+            self.__appliquer_feu_prioritaire()
+
+            if self.__vehicule_prioritaire_a_passe():
+
+                self.__mettre_tous_les_feux_au_rouge()
+
+                self.__etat_priorite = "retour"
+
+                self.__temps_priorite = maintenant
+
+                print(
+                    "Véhicule prioritaire passé"
+                )
+
+        # ------------------------------
+        # 3. Retour au cycle normal
+        # ------------------------------
+
+        elif self.__etat_priorite == "retour":
+
+            self.__mettre_tous_les_feux_au_rouge()
+
+            temps_ecoule = (
+                maintenant
+                - self.__temps_priorite
+            )
+
+            if (
+                temps_ecoule
+                >= self.__duree_transition
+                and self.__intersection_est_libre()
+            ):
+                self.__terminer_priorite()
+
+    def __appliquer_feu_prioritaire(self):
+        for feu in self.__carte.get_feux():
+
+            if (
+                feu.get_direction()
+                == self.__direction_prioritaire
+            ):
+                feu.passer_au_vert()
+
+            else:
+                feu.passer_au_rouge()
+
+    def __terminer_priorite(self):
+        print(
+            "Fin de priorité :",
+            self.__demande_prioritaire_active[
+                "service"
+            ]
+        )
+
+        self.__demande_prioritaire_active = None
+        self.__vehicule_prioritaire_actif = None
+        self.__direction_prioritaire = None
+        self.__etat_priorite = None
+
+        # Une autre demande attend.
+        if len(self.__demandes_prioritaires) > 0:
+            print(
+                "Une autre demande prioritaire "
+                "est en attente"
+            )
+
+            self.__activer_prochaine_priorite()
+
+            return
+
+        # Plus aucune urgence :
+        # retour au cycle normal.
+        if self.__phase_avant_priorite is not None:
+            self.__phase_feux = (
+                self.__phase_avant_priorite
+            )
+
+        self.__appliquer_phase_feux()
+
+        self.__phase_avant_priorite = None
+
+        self.__transition_feux = False
+        self.__temps_phase = time.time()
+
+        print(
+            "Retour au fonctionnement normal"
+        )
+
+    def __vehicule_prioritaire_a_passe(self):
+
+        vehicule = (
+            self.__vehicule_prioritaire_actif
+        )
+
+        if vehicule is None:
+            return False
+
+        intersections = (
+            self.__carte.get_intersections()
+        )
+
+        if len(intersections) == 0:
+            return False
+
+        intersection = intersections[0]
+
+        x_intersection = (
+            intersection.get_position().get_x()
+        )
+
+        y_intersection = (
+            intersection.get_position().get_y()
+        )
+
+        largeur_intersection = (
+            intersection.get_largeur()
+        )
+
+        hauteur_intersection = (
+            intersection.get_hauteur()
+        )
+
+        position = vehicule.get_position()
+
+        x = position.get_x()
+        y = position.get_y()
+
+        direction = vehicule.get_direction()
+
+        if direction == "est":
+
+            return (
+                x
+                >= x_intersection
+                + largeur_intersection
+            )
+
+        elif direction == "ouest":
+
+            return (
+                x
+                + vehicule.get_largeur()
+                <= x_intersection
+            )
+
+        elif direction == "sud":
+
+            return (
+                y
+                >= y_intersection
+                + hauteur_intersection
+            )
+
+        elif direction == "nord":
+
+            return (
+                y
+                + vehicule.get_hauteur()
+                <= y_intersection
+            )
+
+        return False
 
     def __mettre_tous_les_feux_au_rouge(self):
         for feu in self.__carte.get_feux():
@@ -92,48 +519,81 @@ class Simulation:
 
             if self.__phase_feux == "nord_sud":
 
-                if direction == "nord" or direction == "sud":
+                if (
+                    direction == "nord"
+                    or direction == "sud"
+                ):
                     feu.passer_au_vert()
+
                 else:
                     feu.passer_au_rouge()
 
             elif self.__phase_feux == "est_ouest":
 
-                if direction == "est" or direction == "ouest":
+                if (
+                    direction == "est"
+                    or direction == "ouest"
+                ):
                     feu.passer_au_vert()
+
                 else:
                     feu.passer_au_rouge()
 
     def __trouver_feu(self, direction):
         for feu in self.__carte.get_feux():
+
             if feu.get_direction() == direction:
                 return feu
 
         return None
 
+    # --------------------------------------------------
+    # RESPECT DES FEUX
+    # --------------------------------------------------
+
     def __doit_s_arreter_au_feu(self, vehicule):
-        feu = self.__trouver_feu(
-            vehicule.get_direction()
+        forcer_arret = (
+            self.__vehicule_en_attente_priorite(
+                vehicule
+            )
         )
 
-        if feu is None:
-            return False
+        if not forcer_arret:
 
-        if feu.get_etat() != Feu.ROUGE:
-            return False
+            feu = self.__trouver_feu(
+                vehicule.get_direction()
+            )
 
-        intersections = self.__carte.get_intersections()
+            if feu is None:
+                return False
+
+            if feu.get_etat() != Feu.ROUGE:
+                return False
+
+        intersections = (
+            self.__carte.get_intersections()
+        )
 
         if len(intersections) == 0:
             return False
 
         intersection = intersections[0]
 
-        x_intersection = intersection.get_position().get_x()
-        y_intersection = intersection.get_position().get_y()
+        x_intersection = (
+            intersection.get_position().get_x()
+        )
 
-        largeur_intersection = intersection.get_largeur()
-        hauteur_intersection = intersection.get_hauteur()
+        y_intersection = (
+            intersection.get_position().get_y()
+        )
+
+        largeur_intersection = (
+            intersection.get_largeur()
+        )
+
+        hauteur_intersection = (
+            intersection.get_hauteur()
+        )
 
         position = vehicule.get_position()
 
@@ -145,6 +605,7 @@ class Simulation:
         direction = vehicule.get_direction()
 
         if direction == "est":
+
             position_arret = (
                 x_intersection
                 - vehicule.get_largeur()
@@ -158,6 +619,7 @@ class Simulation:
                 return True
 
         elif direction == "ouest":
+
             position_arret = (
                 x_intersection
                 + largeur_intersection
@@ -166,11 +628,14 @@ class Simulation:
 
             if (
                 x <= position_arret
-                and x > x_intersection + largeur_intersection
+                and x
+                > x_intersection
+                + largeur_intersection
             ):
                 return True
 
         elif direction == "sud":
+
             position_arret = (
                 y_intersection
                 - vehicule.get_hauteur()
@@ -184,6 +649,7 @@ class Simulation:
                 return True
 
         elif direction == "nord":
+
             position_arret = (
                 y_intersection
                 + hauteur_intersection
@@ -192,11 +658,17 @@ class Simulation:
 
             if (
                 y <= position_arret
-                and y > y_intersection + hauteur_intersection
+                and y
+                > y_intersection
+                + hauteur_intersection
             ):
                 return True
 
         return False
+
+    # --------------------------------------------------
+    # DISTANCE ENTRE VEHICULES
+    # --------------------------------------------------
 
     def __vehicule_trop_proche(self, vehicule):
         for autre in self.__vehicules:
@@ -204,7 +676,10 @@ class Simulation:
             if autre == vehicule:
                 continue
 
-            if autre.get_direction() != vehicule.get_direction():
+            if (
+                autre.get_direction()
+                != vehicule.get_direction()
+            ):
                 continue
 
             direction = vehicule.get_direction()
@@ -214,10 +689,16 @@ class Simulation:
 
             if direction == "est":
 
-                if position.get_y() != position_autre.get_y():
+                if (
+                    position.get_y()
+                    != position_autre.get_y()
+                ):
                     continue
 
-                if position_autre.get_x() > position.get_x():
+                if (
+                    position_autre.get_x()
+                    > position.get_x()
+                ):
                     distance = (
                         position_autre.get_x()
                         - (
@@ -226,15 +707,25 @@ class Simulation:
                         )
                     )
 
-                    if 0 <= distance < self.__distance_minimale:
+                    if (
+                        0
+                        <= distance
+                        < self.__distance_minimale
+                    ):
                         return True
 
             elif direction == "ouest":
 
-                if position.get_y() != position_autre.get_y():
+                if (
+                    position.get_y()
+                    != position_autre.get_y()
+                ):
                     continue
 
-                if position_autre.get_x() < position.get_x():
+                if (
+                    position_autre.get_x()
+                    < position.get_x()
+                ):
                     distance = (
                         position.get_x()
                         - (
@@ -243,15 +734,25 @@ class Simulation:
                         )
                     )
 
-                    if 0 <= distance < self.__distance_minimale:
+                    if (
+                        0
+                        <= distance
+                        < self.__distance_minimale
+                    ):
                         return True
 
             elif direction == "sud":
 
-                if position.get_x() != position_autre.get_x():
+                if (
+                    position.get_x()
+                    != position_autre.get_x()
+                ):
                     continue
 
-                if position_autre.get_y() > position.get_y():
+                if (
+                    position_autre.get_y()
+                    > position.get_y()
+                ):
                     distance = (
                         position_autre.get_y()
                         - (
@@ -260,15 +761,25 @@ class Simulation:
                         )
                     )
 
-                    if 0 <= distance < self.__distance_minimale:
+                    if (
+                        0
+                        <= distance
+                        < self.__distance_minimale
+                    ):
                         return True
 
             elif direction == "nord":
 
-                if position.get_x() != position_autre.get_x():
+                if (
+                    position.get_x()
+                    != position_autre.get_x()
+                ):
                     continue
 
-                if position_autre.get_y() < position.get_y():
+                if (
+                    position_autre.get_y()
+                    < position.get_y()
+                ):
                     distance = (
                         position.get_y()
                         - (
@@ -277,13 +788,23 @@ class Simulation:
                         )
                     )
 
-                    if 0 <= distance < self.__distance_minimale:
+                    if (
+                        0
+                        <= distance
+                        < self.__distance_minimale
+                    ):
                         return True
 
         return False
 
+    # --------------------------------------------------
+    # INTERSECTION
+    # --------------------------------------------------
+
     def __intersection_est_libre(self):
-        intersections = self.__carte.get_intersections()
+        intersections = (
+            self.__carte.get_intersections()
+        )
 
         if len(intersections) == 0:
             return True
@@ -293,8 +814,15 @@ class Simulation:
         x1 = intersection.get_position().get_x()
         y1 = intersection.get_position().get_y()
 
-        x2 = x1 + intersection.get_largeur()
-        y2 = y1 + intersection.get_hauteur()
+        x2 = (
+            x1
+            + intersection.get_largeur()
+        )
+
+        y2 = (
+            y1
+            + intersection.get_hauteur()
+        )
 
         for vehicule in self.__vehicules:
 
@@ -303,8 +831,15 @@ class Simulation:
             vx1 = position.get_x()
             vy1 = position.get_y()
 
-            vx2 = vx1 + vehicule.get_largeur()
-            vy2 = vy1 + vehicule.get_hauteur()
+            vx2 = (
+                vx1
+                + vehicule.get_largeur()
+            )
+
+            vy2 = (
+                vy1
+                + vehicule.get_hauteur()
+            )
 
             if (
                 vx2 > x1
@@ -316,6 +851,10 @@ class Simulation:
 
         return True
 
+    # --------------------------------------------------
+    # REAPPARITION DES VEHICULES
+    # --------------------------------------------------
+
     def __replacer_vehicule(self, vehicule):
         position = vehicule.get_position()
 
@@ -326,13 +865,131 @@ class Simulation:
         hauteur = self.__carte.get_hauteur()
 
         if x > largeur:
-            position.set_x(-vehicule.get_largeur())
+            position.set_x(
+                -vehicule.get_largeur()
+            )
 
         elif x < -vehicule.get_largeur():
             position.set_x(largeur)
 
         if y > hauteur:
-            position.set_y(-vehicule.get_hauteur())
+            position.set_y(
+                -vehicule.get_hauteur()
+            )
 
         elif y < -vehicule.get_hauteur():
             position.set_y(hauteur)
+
+    def __demande_existe(self, identifiant):
+        if self.__demande_prioritaire_active is not None:
+
+            if (
+                    self.__demande_prioritaire_active["id"]
+                    == identifiant
+            ):
+                return True
+
+        for demande in self.__demandes_prioritaires:
+
+            if demande["id"] == identifiant:
+                return True
+
+        return False
+
+    def __activer_prochaine_priorite(self):
+        if len(self.__demandes_prioritaires) == 0:
+            return
+
+        meilleure_demande = (
+            self.__demandes_prioritaires[0]
+        )
+
+        for demande in self.__demandes_prioritaires:
+
+            if (
+                    demande["priorite"]
+                    > meilleure_demande["priorite"]
+            ):
+                meilleure_demande = demande
+
+            elif (
+                    demande["priorite"]
+                    == meilleure_demande["priorite"]
+            ):
+
+                if (
+                        demande["ordre_arrivee"]
+                        < meilleure_demande["ordre_arrivee"]
+                ):
+                    meilleure_demande = demande
+
+        self.__demandes_prioritaires.remove(
+            meilleure_demande
+        )
+
+        self.__activer_demande_prioritaire(
+            meilleure_demande
+        )
+
+    def __activer_demande_prioritaire(
+            self,
+            demande
+    ):
+        vehicule = self.__trouver_vehicule(
+            demande["id"]
+        )
+
+        if vehicule is None:
+            return
+
+        self.__demande_prioritaire_active = (
+            demande
+        )
+
+        self.__vehicule_prioritaire_actif = (
+            vehicule
+        )
+
+        self.__direction_prioritaire = (
+            demande["direction"]
+        )
+
+        if self.__phase_avant_priorite is None:
+            self.__phase_avant_priorite = (
+                self.__phase_feux
+            )
+
+        self.__etat_priorite = "securisation"
+
+        self.__temps_priorite = time.time()
+
+        self.__mettre_tous_les_feux_au_rouge()
+
+        print(
+            "Priorité activée :",
+            demande["service"],
+            "- priorité",
+            demande["priorite"],
+            "- direction",
+            demande["direction"]
+        )
+
+    def __vehicule_en_attente_priorite(
+            self,
+            vehicule
+    ):
+        if not isinstance(
+                vehicule,
+                VehiculePrioritaire
+        ):
+            return False
+
+        for demande in self.__demandes_prioritaires:
+
+            if (
+                    demande["id"]
+                    == vehicule.get_identifiant()
+            ):
+                return True
+
+        return False
