@@ -1,12 +1,36 @@
 from src.model.vehicule import Vehicule
 
+
 class VehiculePrioritaire(Vehicule):
-    def __init__(self,x,y,vitesse,direction,type_service,niveau_priorite,type_urgence,urgence_id):
-        super().__init__(x,y,vitesse,direction)
+    """Représente un véhicule prioritaire."""
+
+    def __init__(
+        self,
+        identifiant,
+        position,
+        vitesse,
+        direction,
+        type_service,
+        niveau_priorite,
+        couleur="red",
+        largeur=30,
+        hauteur=20,
+        urgence_id=None
+    ):
+        super().__init__(
+            identifiant,
+            position,
+            vitesse,
+            direction,
+            couleur,
+            largeur,
+            hauteur
+        )
 
         self.__type_service = type_service
         self.__niveau_priorite = niveau_priorite
-        self.__type_urgence = type_urgence
+        self.__en_intervention = True
+        self.__message_envoye = False
         self.__urgence_id = urgence_id
 
     def get_type_service(self):
@@ -15,20 +39,17 @@ class VehiculePrioritaire(Vehicule):
     def get_niveau_priorite(self):
         return self.__niveau_priorite
 
-    def get_type_urgence(self):
-        return self.__type_urgence
-
     def get_urgence_id(self):
         return self.__urgence_id
 
-    def get_couleur(self):
-        if self.__type_service == "ambulance":
-            return "white"
+    def est_en_intervention(self):
+        return self.__en_intervention
 
-        elif self.__type_service == "pompier":
-            return "red"
+    def set_en_intervention(self, en_intervention):
+        self.__en_intervention = en_intervention
 
-        elif self.__type_service == "police":
-            return "blue"
+    def message_deja_envoye(self):
+        return self.__message_envoye
 
-        return "red"
+    def marquer_message_envoye(self):
+        self.__message_envoye = True
