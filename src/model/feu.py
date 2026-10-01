@@ -1,17 +1,21 @@
 class Feu:
-    def __init__(self, x, y, etat):
-        self.x = x
-        self.y = y
-        self.etat = etat
-        self.compteur = 0
+    def __init__(self, x, y, etat="rouge", compteur=0):
+        self.__x = x
+        self.__y = y
+        self.__etat = etat
+        self.__compteur = compteur
 
-    def mettre_a_jour(self):
-        self.compteur = self.compteur + 1
+    def get_compteur(self):
+        return self.__compteur
 
-        if self.compteur >= 100:
-            if self.etat == "rouge":
-                self.etat = "vert"
-            else:
-                self.etat = "rouge"
+    def get_x(self):
+        return self.__x
 
-            self.compteur = 0
+    def get_y(self):
+        return self.__y
+
+    def get_etat(self):
+        return self.__etat
+
+    def set_etat(self, etat):
+        self.__etat = etat

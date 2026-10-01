@@ -1,19 +1,50 @@
 class Vehicule:
     def __init__(self, x, y, vitesse, direction):
-        self.x = x
-        self.y = y
-        self.vitesse = vitesse
-        self.direction = direction
+        self.__x = x
+        self.__y = y
+        self.__vitesse = float(vitesse)
+        self.__direction = direction
 
-    def avancer(self):
-        if self.direction == "droite":
-            self.x = self.x + self.vitesse
+    def get_x(self):
+        return self.__x
+    def get_y(self):
+        return self.__y
+    def get_vitesse(self):
+        return self.__vitesse
+    def get_direction(self):
+        return self.__direction
 
-        elif self.direction == "gauche":
-            self.x = self.x - self.vitesse
+    def get_dimensions(self):
+        if self.__direction == "droite" or self.__direction == "gauche":
+            return 30, 20 # (Largeur, Hauteur)
+        elif self.__direction == "bas" or self.__direction == "haut":
+            return 20, 30 # (Largeur, Hauteur)
+        else:
+            return 30, 20 # Valeurs par défaut
 
-        elif self.direction == "bas":
-            self.y = self.y + self.vitesse
+    def get_largeur(self):
+        l, h = self.get_dimensions()
+        return l
 
-        elif self.direction == "haut":
-            self.y = self.y - self.vitesse
+    def get_hauteur(self):
+        l, h = self.get_dimensions()
+        return h
+
+    def set_x(self, valeur):
+        self.__x = valeur
+
+    def set_y(self, valeur):
+        self.__y = valeur
+
+    def avancer(self, vitesse_calculee = None):
+
+        vitesse = vitesse_calculee if vitesse_calculee is not None else self.__vitesse
+
+        if self.__direction == "droite":
+            self.__x += vitesse
+        elif self.__direction == "gauche":
+            self.__x -= vitesse
+        elif self.__direction == "bas":
+            self.__y += vitesse
+        elif self.__direction == "haut":
+            self.__y -= vitesse

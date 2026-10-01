@@ -3,6 +3,7 @@ from PyQt6.QtGui import QPainter
 from PyQt6.QtCore import QTimer, Qt
 
 
+
 class Interface(QWidget):
     def __init__(self, simulation):
         super().__init__()
@@ -26,22 +27,17 @@ class Interface(QWidget):
         # Routes
         painter.setBrush(Qt.GlobalColor.darkGray)
 
-        for route in self.simulation.routes:
-            painter.drawRect(
-                route.x,
-                route.y,
-                route.largeur,
-                route.hauteur
-            )
+        for route in self.simulation.get_routes():
+            painter.drawRect(int(route.get_x()), int(route.get_y()), int(route.get_largeur()), int(route.get_hauteur()),)
 
         # Feux
-        for feu in self.simulation.feux:
+        for feu in self.simulation.get_feux():
 
             # Petit poteau
             painter.setBrush(Qt.GlobalColor.gray)
             painter.drawRect(
-                feu.x + 10,
-                feu.y + 45,
+                feu.get_x() + 10,
+                feu.get_y() + 65,
                 4,
                 20
             )
@@ -49,57 +45,71 @@ class Interface(QWidget):
             # Boîtier noir du feu
             painter.setBrush(Qt.GlobalColor.black)
             painter.drawRect(
-                feu.x,
-                feu.y,
+                feu.get_x(),
+                feu.get_y(),
                 24,
-                45
+                65
             )
 
             # Feu rouge
-            if feu.etat == "rouge":
+            if feu.get_etat() == "rouge":
                 painter.setBrush(Qt.GlobalColor.red)
             else:
                 painter.setBrush(Qt.GlobalColor.darkRed)
 
             painter.drawEllipse(
-                feu.x + 5,
-                feu.y + 5,
+                feu.get_x() + 5,
+                feu.get_y() + 5,
                 14,
                 14
             )
 
             # Feu vert
-            if feu.etat == "vert":
+            if feu.get_etat() == "vert":
                 painter.setBrush(Qt.GlobalColor.green)
             else:
                 painter.setBrush(Qt.GlobalColor.darkGreen)
 
             painter.drawEllipse(
-                feu.x + 5,
-                feu.y + 25,
+                feu.get_x() + 5,
+                feu.get_y() + 45,
                 14,
                 14
             )
 
-        # Véhicules
-        for vehicule in self.simulation.vehicules:
+            # Feu orange
+            if feu.get_etat() == "orange":
+                painter.setBrush(Qt.GlobalColor.yellow)
+            else:
+                painter.setBrush(Qt.GlobalColor.darkYellow)
 
-            if self.simulation.intersection.contient(vehicule):
+            painter.drawEllipse(
+                feu.get_x() + 5,
+                feu.get_y() + 25,
+                14,
+                14
+            )
+        for vehicule in self.simulation.get_vehicules():
+
+            if self.simulation.get_intersections().contient(vehicule):
                 painter.setBrush(Qt.GlobalColor.red)
             else:
                 painter.setBrush(Qt.GlobalColor.blue)
 
-            if vehicule.direction == "haut" or vehicule.direction == "bas":
+            largeur = vehicule.get_largeur()
+            hauteur = vehicule.get_hauteur()
+
+            if vehicule.get_direction() == "haut" or vehicule.get_direction() == "bas":
                 painter.drawRect(
-                    vehicule.x,
-                    vehicule.y,
-                    20,
-                    30
+                    int(vehicule.get_x()),
+                    int(vehicule.get_y()),
+                    int(largeur),
+                    int(hauteur)
                 )
             else:
                 painter.drawRect(
-                    vehicule.x,
-                    vehicule.y,
-                    30,
-                    20
+                    int(vehicule.get_x()),
+                    int(vehicule.get_y()),
+                    int(largeur),
+                    int(hauteur)
                 )
