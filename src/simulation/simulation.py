@@ -23,8 +23,8 @@ class Simulation:
         self.__intersection = Intersection(340, 250, 120, 120)
 
         # Feux de la route horizontale
-        self.__feu_droite = Feu(300, 230, "vert")
-        self.__feu_gauche = Feu(480, 390, "vert")
+        self.__feu_droite = Feu(460, 180, "vert")
+        self.__feu_gauche = Feu(330, 390, "vert")
 
         # Feux de la route verticale
         self.__feu_bas = Feu(320, 210, "rouge")
@@ -39,16 +39,16 @@ class Simulation:
         self.__feux.append(self.__feu_haut)
 
         self.__spawn_pos = {
-            "droite": {"x": 50, "y": 280},  # Point de départ initial (pour éviter le chevauchement)
-            "gauche": {"x": 750, "y": 320},
+            "droite": {"x": 50, "y": 320},
+            "gauche": {"x": 750, "y": 280},
             "bas": {"x": 370, "y": 0},
             "haut": {"x": 410, "y": 600}
         }
 
-        voiture1 = Vehicule(50, 280, 2, "droite")
-        voiture2 = Vehicule(700, 320, 1, "gauche")
-        voiture3 = Vehicule(370, 50, 2, "bas")
-        voiture4 = Vehicule(410, 500, 1, "haut")
+        voiture1 = Vehicule(50, 320, 4, "droite")
+        voiture2 = Vehicule(700, 280, 4, "gauche")
+        voiture3 = Vehicule(370, 50, 4, "bas")
+        voiture4 = Vehicule(410, 500, 4, "haut")
 
         self.__vehicules.append(voiture1)
         self.__vehicules.append(voiture2)
@@ -68,20 +68,15 @@ class Simulation:
         if random.randint(1, 30) == 1 and len(self.__vehicules) < 25:
             directions = ["droite", "gauche", "bas", "haut"]
             direction = random.choice(directions)
-            vitesse = random.uniform(1, 3)
+            vitesse = random.uniform(3, 5)
 
             spawn_pos = self.__spawn_pos[direction]
             x, y = spawn_pos["x"], spawn_pos["y"]
 
-            if direction == "droite":
-                # Le nouveau véhicule doit être légèrement en arrière du précédent
-                x -= 30  # On recule de la largeur d'une voiture (environ)
-            elif direction == "gauche":
-                x += 30  # On avance de la largeur d'une voiture
-            elif direction == "bas":
-                y -= 30  # On monte de la hauteur d'une voiture
-            else:  # haut
-                y += 30  # On descend de la hauteur d'une voiture
+            for v in self.__vehicules:
+                if v.get_direction() == direction:
+                    if abs(v.get_x() - x) < 40 and abs(v.get_y() - y) < 40:
+                        return
 
             voiture = Vehicule(x, y, vitesse, direction)
             self.__vehicules.append(voiture)
@@ -96,6 +91,12 @@ class Simulation:
             else:  # haut
                 self.__spawn_pos["haut"]["y"] = y
 
+    def despawn_vehicles(self):
+        vehicules_a_garder = []
+        for vehicule in self.__vehicules:
+            if 0 <= vehicule.get_x() <= 800 and 0 <= vehicule.get_y() <= 600:
+                vehicules_a_garder.append(vehicule)
+        self.__vehicules = vehicules_a_garder
 
     def feux_sync(self):
         self.__time_remaining -= 1
@@ -141,169 +142,73 @@ class Simulation:
     def avancer(self):
         self.feux_sync()
 
-        # Mouvement en file
-        for direction in ["droite", "gauche", "bas", "haut"]:
 
-            vehicules_de_direction = [v for v in self.__vehicules if v.get_direction() == direction]
+        # Arrete des vehicules en fonction de son environement
+        for vehicule in self.__vehicules:
+            doit_s_arreter = False
 
-            if not vehicules_de_direction:
-                continue
-
-            # Tri des véhicules par position pour créer la file d'attente
-            if direction == "droite":
-                vehicules_de_direction.sort(key=lambda v: v.get_x())
-            elif direction == "gauche":
-                vehicules_de_direction.sort(key=lambda v: v.get_x(), reverse=True)
-            elif direction == "bas":
-                vehicules_de_direction.sort(key=lambda v: v.get_y())
-            elif direction == "haut":
-                vehicules_de_direction.sort(key=lambda v: v.get_y(), reverse=True)
-
-            # Boucle de calcul du mouvement pour chaque véhicule dans la file d'attente
-            for i, vehicule in enumerate(vehicules_de_direction):
-
-
-                # Droite
-                if direction == "droite":
-                    position_arret = self.__intersection.get_x() - 30
-                    doit_s_arreter = False
-                    vitesse_cible = vehicule.get_vitesse()
-
-                    if i > 0:
-                        voisin = vehicules_de_direction[i - 1]
-                        distance_x = abs(vehicule.get_x() - voisin.get_x())
-
-                        MIN_DISTANCE = 35
-
-                        if distance_x < MIN_DISTANCE:
+            if vehicule.get_direction() == "droite":
+                position_arret = self.__intersection.get_x() - 30
+                if self.__feu_droite.get_etat() in ("rouge", "orange"):
+                    if vehicule.get_x() <= position_arret:
+                        if vehicule.get_x() + vehicule.get_vitesse() >= position_arret:
+                            vehicule.set_x(position_arret)
                             doit_s_arreter = True
 
-                    if self.__feu_droite.get_etat() in ("rouge", "orange"):
-                        if vehicule.get_x() <= position_arret:
-                            if vehicule.get_x() + vehicule.get_vitesse() >= position_arret:
-                                vehicule.set_x(position_arret)
-                                doit_s_arreter = True
+            elif vehicule.get_direction() == "gauche":
+                position_arret = self.__intersection.get_x() + self.__intersection.get_largeur()
+                if self.__feu_gauche.get_etat() in ("rouge", "orange"):
+                    if vehicule.get_x() >= position_arret:
+                        if vehicule.get_x() - vehicule.get_vitesse() <= position_arret:
+                            vehicule.set_x(position_arret)
+                            doit_s_arreter = True
 
-                    else:
-                        if i > 0:
-                            voisin = vehicules_de_direction[i-1]
-                            distance_x = abs(vehicule.get_x() - voisin.get_x())
+            elif vehicule.get_direction() == "bas":
+                position_arret = self.__intersection.get_y() - 30
+                if self.__feu_bas.get_etat() in ("rouge", "orange"):
+                    if vehicule.get_y() <= position_arret:
+                        if vehicule.get_y() + vehicule.get_vitesse() >= position_arret:
+                            vehicule.set_y(position_arret)
+                            doit_s_arreter = True
 
-                            MIN_DISTANCE = 35
-                            MAX_DISTANCE = 60
+            elif vehicule.get_direction() == "haut":
+                position_arret = self.__intersection.get_y() + self.__intersection.get_hauteur()
+                if self.__feu_haut.get_etat() in ("rouge", "orange"):
+                    if vehicule.get_y() >= position_arret:
+                        if vehicule.get_y() - vehicule.get_vitesse() <= position_arret:
+                            vehicule.set_y(position_arret)
+                            doit_s_arreter = True
 
-                            if distance_x < MIN_DISTANCE:
-                                doit_s_arreter = True
-                            elif distance_x > MAX_DISTANCE:
-                                vitesse_cible = vehicule.get_vitesse()
-                            else:
-                                # Calcul du ralentissement
-                                vitesse_calcul = MAX_DISTANCE / (distance_x / 2)
-                                vitesse_cible = min(3, vitesse_calcul)
-                    if doit_s_arreter:
-                        vehicule.set_x(position_arret)
-                    else:
-                        vehicule.avancer(vitesse_cible)
+            for autre in self.__vehicules:
+                if autre is vehicule:
+                    continue
+                if autre.get_direction() != vehicule.get_direction():
+                    continue
+                seuil = 50  # distance minimale à garder, en pixels
 
-                # Gauche
+                if vehicule.get_direction() == "droite":
+                    if autre.get_x() > vehicule.get_x():
+                        if autre.get_x() - vehicule.get_x() < seuil:
+                            doit_s_arreter = True
+
+
                 elif vehicule.get_direction() == "gauche":
-                    position_arret = self.__intersection.get_x() + self.__intersection.get_largeur()
-                    doit_s_arreter = False
-                    vitesse_cible = vehicule.get_vitesse()
+                    if autre.get_x() < vehicule.get_x():
+                        if vehicule.get_x() - autre.get_x() < seuil:
+                            doit_s_arreter = True
 
-                    if self.__feu_gauche.get_etat() in ("rouge", "orange"):
-                        if vehicule.get_x() >= position_arret:
-                            if vehicule.get_x() - vehicule.get_vitesse() <= position_arret:
-                                vehicule.set_x(position_arret)
-                                doit_s_arreter = True
-
-                    elif self.__feu_gauche.get_etat() == "vert":
-                        if i > 0:
-                            voisin = vehicules_de_direction[i-1]
-                            distance_x = abs(vehicule.get_x() - voisin.get_x())
-
-                            MIN_DISTANCE = 20
-                            MAX_DISTANCE = 50
-
-                            if distance_x < MIN_DISTANCE:
-                                doit_s_arreter = True
-                            elif distance_x > MAX_DISTANCE:
-                                vitesse_cible = vehicule.get_vitesse()
-                            else:
-                                vitesse_calcul = MAX_DISTANCE / (distance_x / 2)
-                                vitesse_cible = min(3, vitesse_calcul)
-                    if doit_s_arreter:
-                        vehicule.set_x(position_arret)
-                    else:
-                        vehicule.avancer(vitesse_cible)
-
-                # Bas
                 elif vehicule.get_direction() == "bas":
-                    position_arret = self.__intersection.get_y() - 30
-                    doit_s_arreter = False
-                    vitesse_cible = vehicule.get_vitesse()
+                    if autre.get_y() > vehicule.get_y():
+                        if autre.get_y() - vehicule.get_y() < seuil:
+                            doit_s_arreter = True
 
-                    if self.__feu_bas.get_etat() in ("rouge", "orange"):
-                        if vehicule.get_y() <= position_arret:
-                            if vehicule.get_y() + vehicule.get_vitesse() >= position_arret:
-                                vehicule.set_y(position_arret)
-                                doit_s_arreter = True
 
-                    elif self.__feu_bas.get_etat() == "vert":
-                        if i > 0:
-                            voisin = vehicules_de_direction[i-1]
-                            distance_y = abs(vehicule.get_y() - voisin.get_y())
-
-                            MIN_DISTANCE = 20
-                            MAX_DISTANCE = 50
-
-                            if distance_y < MIN_DISTANCE:
-                                doit_s_arreter = True
-                            elif distance_y > MAX_DISTANCE:
-                                vitesse_cible = vehicule.get_vitesse()
-                            else:
-                                vitesse_calcul = MAX_DISTANCE / (distance_y / 2)
-                                vitesse_cible = min(3, vitesse_calcul)
-                    if doit_s_arreter:
-                        vehicule.set_x(position_arret)
-                    else:
-                        vehicule.avancer(vitesse_cible)
-
-                # Haut
                 elif vehicule.get_direction() == "haut":
-                    position_arret = self.__intersection.get_y() + self.__intersection.get_hauteur()
-                    doit_s_arreter = False
-                    vitesse_cible = vehicule.get_vitesse()
-
-                    if self.__feu_haut.get_etat() in ("rouge", "orange"):
-                        if vehicule.get_y() >= position_arret:
-                            if vehicule.get_y() - vehicule.get_vitesse() <= position_arret:
-                                vehicule.set_y(position_arret)
-                                doit_s_arreter = True
-
-                    elif self.__feu_haut.get_etat() == "vert":
-                        if i > 0:
-                            voisin = vehicules_de_direction[i-1]
-                            distance_y = abs(vehicule.get_y() - voisin.get_y())
-
-                            MIN_DISTANCE = 20
-                            MAX_DISTANCE = 50
-
-                            if distance_y < MIN_DISTANCE:
-                                doit_s_arreter = True
-                            elif distance_y > MAX_DISTANCE:
-                                vitesse_cible = vehicule.get_vitesse()
-                            else:
-                                vitesse_calcul = MAX_DISTANCE / (distance_y / 2)
-                                vitesse_cible = min(3, vitesse_calcul)
-                    if doit_s_arreter:
-                        vehicule.set_x(position_arret)
-                    else:
-                        vehicule.avancer(vitesse_cible)
-
-
-                # Mouvement Final
-
+                    if autre.get_y() < vehicule.get_y():
+                        if vehicule.get_y() - autre.get_y() < seuil:
+                            doit_s_arreter = True
+            if not doit_s_arreter:
+                vehicule.avancer()
 
         self.spawn_vehicles()
-
+        self.despawn_vehicles()
