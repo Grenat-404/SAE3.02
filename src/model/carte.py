@@ -7,6 +7,18 @@ class Carte:
         self.__routes = []
         self.__intersections = []
         self.__feux = []
+        self.__passages_pietons = []
+
+    def ajouter_passage_pieton(
+            self,
+            passage_pieton
+    ):
+        self.__passages_pietons.append(
+            passage_pieton
+        )
+
+    def get_passages_pietons(self):
+        return self.__passages_pietons
 
     def ajouter_route(self, route):
         self.__routes.append(route)

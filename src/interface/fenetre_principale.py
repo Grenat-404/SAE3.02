@@ -1,5 +1,13 @@
 from PyQt6.QtCore import QTimer
-from PyQt6.QtWidgets import QMainWindow
+from PyQt6.QtWidgets import (
+    QMainWindow,
+    QWidget,
+    QHBoxLayout,
+    QVBoxLayout,
+    QLabel,
+    QComboBox,
+    QPushButton,
+)
 
 from src.model.position import Position
 from src.model.route import Route
@@ -8,6 +16,7 @@ from src.model.carte import Carte
 from src.model.vehicule import Vehicule
 from src.model.vehicule_prioritaire import VehiculePrioritaire
 from src.model.feu import Feu
+from src.model.urgence import Urgence
 
 from src.simulation.simulation import Simulation
 
@@ -16,8 +25,14 @@ from src.interface.vue_carrefour import VueCarrefour
 from src.reseau.serveur import Serveur
 from src.reseau.client import Client
 
-from src.model.urgence import Urgence
 from src.database.urgence_db import UrgenceDB
+
+from src.carte.osm_loader import (
+    OSMLoader,
+    lister_fichiers_cartes,
+    nom_affichable_carte,
+)
+
 
 class FenetrePrincipale(QMainWindow):
     """Fenêtre principale de la simulation."""
@@ -25,13 +40,24 @@ class FenetrePrincipale(QMainWindow):
     def __init__(self):
         super().__init__()
 
+        # --------------------------------------------------
+        # FENETRE
+        # --------------------------------------------------
+
         self.setWindowTitle(
             "SAE3.02 - Simulation de trafic"
         )
 
-        self.resize(1000, 760)
+        self.resize(
+            1000,
+            760
+        )
 
-        self.__carte = self.__creer_carte()
+        # --------------------------------------------------
+        # CARTE DE TEST ET SIMULATION
+        # --------------------------------------------------
+
+        self.__carte = self.__creer_carte_test()
 
         self.__simulation = Simulation(
             self.__carte
@@ -41,24 +67,48 @@ class FenetrePrincipale(QMainWindow):
             self.__carte
         )
 
-        self.setCentralWidget(
-            self.__vue
-        )
+        # --------------------------------------------------
+        # OPENSTREETMAP
+        # --------------------------------------------------
 
-        # Réseau V2I
+        self.__osm_loader = None
+
+        # --------------------------------------------------
+        # RESEAU V2I
+        # --------------------------------------------------
+
         self.__serveur = Serveur()
         self.__client = Client()
 
         self.__serveur.demarrer()
 
-        self.__urgence_db = UrgenceDB()
-        self.__creer_urgences_demo()
-
-        self.__creer_vehicules()
-
         self.statusBar().showMessage(
             "Serveur V2I actif sur 127.0.0.1:5000"
         )
+
+        # --------------------------------------------------
+        # BASE DE DONNEES
+        # --------------------------------------------------
+
+        self.__urgence_db = UrgenceDB()
+
+        self.__creer_urgences_demo()
+
+        # --------------------------------------------------
+        # VEHICULES DE TEST
+        # --------------------------------------------------
+
+        self.__creer_vehicules()
+
+        # --------------------------------------------------
+        # INTERFACE
+        # --------------------------------------------------
+
+        self.__creer_interface_cartes()
+
+        # --------------------------------------------------
+        # TIMER
+        # --------------------------------------------------
 
         self.__timer = QTimer(self)
 
@@ -66,9 +116,389 @@ class FenetrePrincipale(QMainWindow):
             self.__mettre_a_jour
         )
 
-        self.__timer.start(30)
+        self.__timer.start(
+            30
+        )
 
-    def __creer_carte(self):
+    # ==================================================
+    # INTERFACE
+    # ==================================================
+
+    def __creer_interface_cartes(self):
+        """Crée l'interface de sélection des cartes."""
+
+        widget_principal = QWidget()
+
+        self.__layout_principal = QHBoxLayout(
+            widget_principal
+        )
+
+        # --------------------------------------------------
+        # PANNEAU GAUCHE
+        # --------------------------------------------------
+
+        panneau = QWidget()
+
+        panneau.setFixedWidth(
+            250
+        )
+
+        layout_panneau = QVBoxLayout(
+            panneau
+        )
+
+        label_carte = QLabel(
+            "Carte :"
+        )
+
+        self.__combo_cartes = QComboBox()
+
+        label_carrefour = QLabel(
+            "Carrefour :"
+        )
+
+        self.__combo_carrefours = QComboBox()
+
+        self.__bouton_charger_carrefour = QPushButton(
+            "Charger le carrefour"
+        )
+
+        layout_panneau.addWidget(
+            label_carte
+        )
+
+        layout_panneau.addWidget(
+            self.__combo_cartes
+        )
+
+        layout_panneau.addSpacing(
+            15
+        )
+
+        layout_panneau.addWidget(
+            label_carrefour
+        )
+
+        layout_panneau.addWidget(
+            self.__combo_carrefours
+        )
+
+        layout_panneau.addSpacing(
+            15
+        )
+
+        layout_panneau.addWidget(
+            self.__bouton_charger_carrefour
+        )
+
+        layout_panneau.addStretch()
+
+        panneau.setStyleSheet(
+            """
+            QWidget {
+                background-color: #1c1c1c;
+                color: white;
+            }
+
+            QComboBox {
+                background-color: #2c2c2c;
+                color: white;
+                padding: 6px;
+            }
+
+            QPushButton {
+                background-color: #3a3a3a;
+                color: white;
+                padding: 8px;
+            }
+            """
+        )
+
+        # --------------------------------------------------
+        # VUE DE LA SIMULATION
+        # --------------------------------------------------
+
+        self.__layout_principal.addWidget(
+            panneau
+        )
+
+        self.__layout_principal.addWidget(
+            self.__vue,
+            1
+        )
+
+        self.setCentralWidget(
+            widget_principal
+        )
+
+        # --------------------------------------------------
+        # SIGNAUX
+        # --------------------------------------------------
+
+        self.__combo_cartes.currentIndexChanged.connect(
+            self.__carte_selectionnee
+        )
+
+        self.__bouton_charger_carrefour.clicked.connect(
+            self.__charger_carrefour_selectionne
+        )
+
+        self.__charger_liste_cartes()
+
+    # ==================================================
+    # OPENSTREETMAP - LISTE DES CARTES
+    # ==================================================
+
+    def __charger_liste_cartes(self):
+        """Charge automatiquement les cartes présentes dans data/maps."""
+
+        # On bloque temporairement les signaux pour éviter que
+        # currentIndexChanged soit appelé pendant le remplissage.
+        self.__combo_cartes.blockSignals(
+            True
+        )
+
+        self.__combo_cartes.clear()
+
+        # La carte manuelle reste toujours disponible.
+        self.__combo_cartes.addItem(
+            "Carte de test",
+            None
+        )
+
+        fichiers = lister_fichiers_cartes(
+            "data/maps"
+        )
+
+        for chemin in fichiers:
+            nom = nom_affichable_carte(
+                chemin
+            )
+
+            self.__combo_cartes.addItem(
+                nom,
+                chemin
+            )
+
+        self.__combo_cartes.blockSignals(
+            False
+        )
+
+        # On initialise manuellement la liste des carrefours.
+        self.__carte_selectionnee()
+
+        if len(fichiers) == 0:
+            self.statusBar().showMessage(
+                "Aucune carte OpenStreetMap trouvée."
+            )
+
+    def __carte_selectionnee(self):
+        """Charge la liste des carrefours de la carte sélectionnée."""
+
+        chemin = self.__combo_cartes.currentData()
+
+        self.__combo_carrefours.clear()
+
+        # --------------------------------------------------
+        # CARTE DE TEST
+        # --------------------------------------------------
+
+        if chemin is None:
+            self.__osm_loader = None
+
+            self.__combo_carrefours.addItem(
+                "Carrefour de test",
+                None
+            )
+
+            return
+
+        # --------------------------------------------------
+        # CARTE OPENSTREETMAP
+        # --------------------------------------------------
+
+        nom_carte = self.__combo_cartes.currentText()
+
+        self.statusBar().showMessage(
+            f"Chargement de {nom_carte}..."
+        )
+
+        try:
+            self.__osm_loader = OSMLoader(
+                chemin
+            )
+
+            self.__osm_loader.charger()
+
+        except ValueError as erreur:
+            self.__osm_loader = None
+
+            self.statusBar().showMessage(
+                str(erreur)
+            )
+
+            return
+
+        intersections = (
+            self.__osm_loader.get_intersections()
+        )
+
+        if len(intersections) == 0:
+            self.statusBar().showMessage(
+                "Aucun carrefour compatible trouvé."
+            )
+
+            return
+
+        for intersection in intersections:
+            self.__combo_carrefours.addItem(
+                intersection.get_nom_affichage(),
+                intersection.get_node_id()
+            )
+
+        self.statusBar().showMessage(
+            f"{len(intersections)} carrefours compatibles trouvés."
+        )
+
+    # ==================================================
+    # OPENSTREETMAP - CHARGEMENT D'UN CARREFOUR
+    # ==================================================
+
+    def __charger_carrefour_selectionne(self):
+        """Charge le carrefour choisi dans la vue."""
+
+        chemin = self.__combo_cartes.currentData()
+
+        # --------------------------------------------------
+        # CARTE DE TEST
+        # --------------------------------------------------
+
+        if chemin is None:
+            self.__charger_carte_test()
+            return
+
+        # --------------------------------------------------
+        # VERIFICATIONS
+        # --------------------------------------------------
+
+        if self.__osm_loader is None:
+            self.statusBar().showMessage(
+                "Impossible de lire la carte sélectionnée."
+            )
+
+            return
+
+        node_id = self.__combo_carrefours.currentData()
+
+        if node_id is None:
+            self.statusBar().showMessage(
+                "Aucun carrefour sélectionné."
+            )
+
+            return
+
+        intersection_osm = (
+            self.__osm_loader.get_intersection_par_id(
+                node_id
+            )
+        )
+
+        if intersection_osm is None:
+            self.statusBar().showMessage(
+                "Ce carrefour n'est pas encore pris en charge."
+            )
+
+            return
+
+        # --------------------------------------------------
+        # CREATION DE LA CARTE
+        # --------------------------------------------------
+
+        try:
+            nouvelle_carte = (
+                self.__osm_loader.construire_carte(
+                    intersection_osm
+                )
+            )
+
+        except ValueError as erreur:
+            self.statusBar().showMessage(
+                str(erreur)
+            )
+
+            return
+
+        # --------------------------------------------------
+        # ARRET DE LA SIMULATION MANUELLE
+        # --------------------------------------------------
+
+        self.__timer.stop()
+
+        # On supprime les éventuels anciens messages V2I.
+        self.__vider_messages_reseau()
+
+        self.__carte = nouvelle_carte
+
+        self.__simulation = Simulation(
+            self.__carte
+        )
+
+        nouvelle_vue = VueCarrefour(
+            self.__carte
+        )
+
+        self.__remplacer_vue(
+            nouvelle_vue
+        )
+
+        # --------------------------------------------------
+        # VEHICULE OSM V0.2
+        # --------------------------------------------------
+
+        vehicule_cree = self.__creer_vehicule_osm(
+            intersection_osm
+        )
+
+        if not vehicule_cree:
+            return
+
+        # On relance la boucle de simulation.
+        self.__timer.start(
+            30
+        )
+
+        self.statusBar().showMessage(
+            "Carrefour chargé : "
+            + intersection_osm.get_nom_affichage()
+        )
+
+    # ==================================================
+    # REMPLACEMENT DE LA VUE
+    # ==================================================
+
+    def __remplacer_vue(self, nouvelle_vue):
+        """Remplace la vue actuelle par une nouvelle VueCarrefour."""
+
+        ancienne_vue = self.__vue
+
+        self.__layout_principal.replaceWidget(
+            ancienne_vue,
+            nouvelle_vue
+        )
+
+        self.__vue = nouvelle_vue
+
+        ancienne_vue.deleteLater()
+
+        self.__vue.adapter_vue()
+
+    # ==================================================
+    # CARTE MANUELLE DE TEST
+    # ==================================================
+
+    def __creer_carte_test(self):
+        """Crée le carrefour manuel utilisé depuis la V0.1."""
+
         largeur = 1000
         hauteur = 760
 
@@ -78,6 +508,10 @@ class FenetrePrincipale(QMainWindow):
             largeur,
             hauteur
         )
+
+        # --------------------------------------------------
+        # ROUTES
+        # --------------------------------------------------
 
         route_horizontale = Route(
             1,
@@ -101,6 +535,18 @@ class FenetrePrincipale(QMainWindow):
             "verticale"
         )
 
+        carte.ajouter_route(
+            route_horizontale
+        )
+
+        carte.ajouter_route(
+            route_verticale
+        )
+
+        # --------------------------------------------------
+        # INTERSECTION
+        # --------------------------------------------------
+
         intersection = Intersection(
             1,
             Position(
@@ -111,17 +557,13 @@ class FenetrePrincipale(QMainWindow):
             largeur_route
         )
 
-        carte.ajouter_route(
-            route_horizontale
-        )
-
-        carte.ajouter_route(
-            route_verticale
-        )
-
         carte.ajouter_intersection(
             intersection
         )
+
+        # --------------------------------------------------
+        # FEUX
+        # --------------------------------------------------
 
         feu_nord = Feu(
             1,
@@ -165,12 +607,58 @@ class FenetrePrincipale(QMainWindow):
 
         return carte
 
+    def __charger_carte_test(self):
+        """Recharge complètement la carte manuelle et sa simulation."""
+
+        self.__timer.stop()
+
+        # On enlève les anciens messages V2I qui pourraient
+        # concerner une ancienne simulation.
+        self.__vider_messages_reseau()
+
+        self.__carte = self.__creer_carte_test()
+
+        self.__simulation = Simulation(
+            self.__carte
+        )
+
+        nouvelle_vue = VueCarrefour(
+            self.__carte
+        )
+
+        self.__remplacer_vue(
+            nouvelle_vue
+        )
+
+        self.__creer_vehicules()
+
+        self.__timer.start(
+            30
+        )
+
+        self.statusBar().showMessage(
+            "Carte de test chargée."
+        )
+
+    # ==================================================
+    # VEHICULES
+    # ==================================================
+
     def __creer_vehicules(self):
-        # Récupération des urgences dans la base SQLite
-        accident = self.__urgence_db.get_urgence(1)
+        """Crée les véhicules utilisés par la carte de test."""
+
+        # --------------------------------------------------
+        # URGENCES
+        # --------------------------------------------------
+
+        accident = self.__urgence_db.get_urgence(
+            1
+        )
 
         intervention_police = (
-            self.__urgence_db.get_urgence(2)
+            self.__urgence_db.get_urgence(
+                2
+            )
         )
 
         # --------------------------------------------------
@@ -211,8 +699,6 @@ class FenetrePrincipale(QMainWindow):
         # VEHICULES PRIORITAIRES
         # --------------------------------------------------
 
-        # Ambulance appartenant à l'accident grave.
-        # Priorité récupérée depuis SQLite.
         ambulance = VehiculePrioritaire(
             5,
             Position(530, 700),
@@ -225,8 +711,6 @@ class FenetrePrincipale(QMainWindow):
             urgence_id=accident.get_identifiant()
         )
 
-        # Pompier appartenant à la même urgence
-        # que l'ambulance.
         pompier = VehiculePrioritaire(
             6,
             Position(50, 335),
@@ -239,8 +723,6 @@ class FenetrePrincipale(QMainWindow):
             urgence_id=accident.get_identifiant()
         )
 
-        # Véhicule de police appartenant
-        # à une autre urgence.
         police = VehiculePrioritaire(
             7,
             Position(455, 20),
@@ -256,7 +738,7 @@ class FenetrePrincipale(QMainWindow):
         )
 
         # --------------------------------------------------
-        # AJOUT DES VEHICULES A LA SIMULATION
+        # AJOUT A LA SIMULATION
         # --------------------------------------------------
 
         self.__simulation.ajouter_vehicule(
@@ -288,7 +770,7 @@ class FenetrePrincipale(QMainWindow):
         )
 
         # --------------------------------------------------
-        # AJOUT GRAPHIQUE DES VEHICULES
+        # AJOUT DANS LA VUE
         # --------------------------------------------------
 
         for vehicule in self.__simulation.get_vehicules():
@@ -296,7 +778,13 @@ class FenetrePrincipale(QMainWindow):
                 vehicule
             )
 
+    # ==================================================
+    # BOUCLE DE SIMULATION
+    # ==================================================
+
     def __mettre_a_jour(self):
+        """Effectue une étape de la simulation."""
+
         self.__simulation.mettre_a_jour()
 
         self.__envoyer_signalements_prioritaires()
@@ -309,14 +797,19 @@ class FenetrePrincipale(QMainWindow):
 
         self.__vue.mettre_a_jour_feux()
 
+    # ==================================================
+    # RESEAU V2I
+    # ==================================================
+
     def __envoyer_signalements_prioritaires(self):
+        """Envoie les demandes V2I des véhicules prioritaires."""
+
         vehicules = (
             self.__simulation
             .get_vehicules_prioritaires_a_signaler()
         )
 
         for vehicule in vehicules:
-
             message = {
                 "type": "vehicule_prioritaire",
                 "id": vehicule.get_identifiant(),
@@ -334,6 +827,8 @@ class FenetrePrincipale(QMainWindow):
                 vehicule.marquer_message_envoye()
 
     def __traiter_messages_reseau(self):
+        """Récupère et transmet les messages V2I à la simulation."""
+
         messages = (
             self.__serveur.recuperer_messages()
         )
@@ -346,7 +841,9 @@ class FenetrePrincipale(QMainWindow):
                 f"direction {message['direction']}"
             )
 
-            print(texte)
+            print(
+                texte
+            )
 
             self.statusBar().showMessage(
                 texte,
@@ -357,7 +854,18 @@ class FenetrePrincipale(QMainWindow):
                 message
             )
 
+    def __vider_messages_reseau(self):
+        """Supprime les anciens messages V2I en attente."""
+
+        self.__serveur.recuperer_messages()
+
+    # ==================================================
+    # URGENCES
+    # ==================================================
+
     def __creer_urgences_demo(self):
+        """Ajoute les urgences utilisées par la démonstration."""
+
         accident = Urgence(
             1,
             "accident_grave",
@@ -387,6 +895,64 @@ class FenetrePrincipale(QMainWindow):
             intervention_police
         )
 
+    # ==================================================
+    # VEHICULE OPENSTREETMAP
+    # ==================================================
+
+    def __creer_vehicule_osm(
+            self,
+            intersection_osm
+    ):
+        """Crée un véhicule suivant une vraie route OSM."""
+
+        itineraire = (
+            self.__osm_loader.creer_itineraire_demo(
+                intersection_osm
+            )
+        )
+
+        if len(itineraire) < 2:
+            self.statusBar().showMessage(
+                "Impossible de créer un itinéraire "
+                "sur ce carrefour."
+            )
+
+            return False
+
+        premier_point = itineraire[0]
+
+        vehicule = Vehicule(
+            1,
+            Position(
+                premier_point.get_x(),
+                premier_point.get_y()
+            ),
+            2,
+            "osm",
+            couleur="blue",
+            largeur=16,
+            hauteur=10
+        )
+
+        vehicule.set_itineraire(
+            itineraire,
+            aller_retour=True
+        )
+
+        self.__simulation.ajouter_vehicule(
+            vehicule
+        )
+
+        self.__vue.ajouter_vehicule(
+            vehicule
+        )
+
+        return True
+
+    # ==================================================
+    # FERMETURE
+    # ==================================================
+
     def closeEvent(self, event):
         """Arrête proprement la simulation et le serveur."""
 
@@ -394,6 +960,8 @@ class FenetrePrincipale(QMainWindow):
 
         self.__serveur.arreter()
 
-        print("Application arrêtée proprement")
+        print(
+            "Application arrêtée proprement"
+        )
 
         event.accept()

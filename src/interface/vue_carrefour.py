@@ -7,6 +7,13 @@ from PyQt6.QtWidgets import (
 )
 
 from src.model.feu import Feu
+from PyQt6.QtGui import (
+    QColor,
+    QBrush,
+    QPen,
+    QPainterPath
+)
+import math
 
 
 class VueCarrefour(QGraphicsView):
@@ -45,15 +52,140 @@ class VueCarrefour(QGraphicsView):
 
         self.__dessiner_carte()
         self.__dessiner_feux()
+        self.__dessiner_passages_pietons()
+
+
 
     def __dessiner_carte(self):
-        couleur_route = QColor(145, 145, 145)
-        couleur_bordure = QColor(220, 220, 220)
+        couleur_route = QColor(
+            145,
+            145,
+            145
+        )
 
-        pinceau = QBrush(couleur_route)
-        stylo = QPen(couleur_bordure)
+        couleur_bordure = QColor(
+            220,
+            220,
+            220
+        )
+
+        couleur_centrale = QColor(
+            205,
+            205,
+            205
+        )
+
+        pinceau = QBrush(
+            couleur_route
+        )
+
+        stylo = QPen(
+            couleur_bordure
+        )
 
         for route in self.__carte.get_routes():
+
+            # ==================================================
+            # ROUTE OPENSTREETMAP
+            # ==================================================
+
+            if route.est_osm():
+
+                points = route.get_points()
+
+                if len(points) < 2:
+                    continue
+
+                chemin = QPainterPath()
+
+                chemin.moveTo(
+                    points[0].get_x(),
+                    points[0].get_y()
+                )
+
+                for point in points[1:]:
+                    chemin.lineTo(
+                        point.get_x(),
+                        point.get_y()
+                    )
+
+                # ------------------------------------------
+                # CONTOUR
+                # ------------------------------------------
+
+                stylo_bordure = QPen(
+                    couleur_bordure
+                )
+
+                stylo_bordure.setWidthF(
+                    route.get_epaisseur() + 3
+                )
+
+                stylo_bordure.setCapStyle(
+                    Qt.PenCapStyle.RoundCap
+                )
+
+                stylo_bordure.setJoinStyle(
+                    Qt.PenJoinStyle.RoundJoin
+                )
+
+                self.__scene.addPath(
+                    chemin,
+                    stylo_bordure
+                )
+
+                # ------------------------------------------
+                # ROUTE
+                # ------------------------------------------
+
+                stylo_route = QPen(
+                    couleur_route
+                )
+
+                stylo_route.setWidthF(
+                    route.get_epaisseur()
+                )
+
+                stylo_route.setCapStyle(
+                    Qt.PenCapStyle.RoundCap
+                )
+
+                stylo_route.setJoinStyle(
+                    Qt.PenJoinStyle.RoundJoin
+                )
+
+                self.__scene.addPath(
+                    chemin,
+                    stylo_route
+                )
+
+                # ------------------------------------------
+                # LIGNE CENTRALE
+                # ------------------------------------------
+
+                if not route.est_sens_unique():
+                    stylo_centre = QPen(
+                        couleur_centrale
+                    )
+
+                    stylo_centre.setWidthF(
+                        1
+                    )
+
+                    stylo_centre.setStyle(
+                        Qt.PenStyle.DashLine
+                    )
+
+                    self.__scene.addPath(
+                        chemin,
+                        stylo_centre
+                    )
+
+                continue
+
+            # ==================================================
+            # CARTE MANUELLE
+            # ==================================================
 
             position = route.get_position()
 
@@ -66,7 +198,17 @@ class VueCarrefour(QGraphicsView):
                 pinceau
             )
 
+        # ==================================================
+        # INTERSECTIONS MANUELLES
+        # ==================================================
+
         for intersection in self.__carte.get_intersections():
+
+            if (
+                    intersection.get_largeur() <= 1
+                    or intersection.get_hauteur() <= 1
+            ):
+                continue
 
             position = intersection.get_position()
 
@@ -116,6 +258,50 @@ class VueCarrefour(QGraphicsView):
         }
 
         for feu in self.__carte.get_feux():
+            if feu.est_osm():
+                position = feu.get_position()
+
+                position_x = (
+                        position.get_x() - 7
+                )
+
+                position_y = (
+                        position.get_y() - 14
+                )
+
+                self.__scene.addRect(
+                    position_x,
+                    position_y,
+                    14,
+                    28,
+                    QPen(QColor(240, 240, 240)),
+                    QBrush(QColor(10, 10, 10))
+                )
+
+                rouge = self.__scene.addEllipse(
+                    position_x + 3,
+                    position_y + 3,
+                    8,
+                    8,
+                    QPen(QColor(240, 240, 240))
+                )
+
+                vert = self.__scene.addEllipse(
+                    position_x + 3,
+                    position_y + 17,
+                    8,
+                    8,
+                    QPen(QColor(240, 240, 240))
+                )
+
+                self.__items_feux[
+                    feu.get_identifiant()
+                ] = {
+                    "rouge": rouge,
+                    "vert": vert
+                }
+
+                continue
 
             direction = feu.get_direction()
 
@@ -168,6 +354,11 @@ class VueCarrefour(QGraphicsView):
             vehicule.get_hauteur()
         )
 
+        item.setTransformOriginPoint(
+            vehicule.get_largeur() / 2,
+            vehicule.get_hauteur() / 2
+        )
+
         item.setBrush(
             QBrush(
                 QColor(vehicule.get_couleur())
@@ -210,6 +401,11 @@ class VueCarrefour(QGraphicsView):
                 position.get_y()
             )
 
+            if vehicule.a_itineraire():
+                item.setRotation(
+                    vehicule.get_angle_deplacement()
+                )
+
     def mettre_a_jour_feux(self):
         for feu in self.__carte.get_feux():
 
@@ -238,4 +434,99 @@ class VueCarrefour(QGraphicsView):
 
                 items["vert"].setBrush(
                     QBrush(QColor(0, 255, 0))
+                )
+
+    def adapter_vue(self):
+        """Adapte le zoom à la taille de la carte."""
+
+        self.fitInView(
+            self.__scene.sceneRect(),
+            Qt.AspectRatioMode.KeepAspectRatio
+        )
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+
+        self.adapter_vue()
+
+    def __dessiner_passages_pietons(self):
+        """Affiche simplement les passages piétons OSM."""
+
+        for passage in (
+                self.__carte.get_passages_pietons()
+        ):
+
+            position = (
+                passage.get_position()
+            )
+
+            angle = math.radians(
+                passage.get_angle_route()
+            )
+
+            # Direction de la route
+            route_x = math.cos(angle)
+            route_y = math.sin(angle)
+
+            # Direction perpendiculaire
+            perpendiculaire_x = -route_y
+            perpendiculaire_y = route_x
+
+            stylo = QPen(
+                QColor(235, 235, 235)
+            )
+
+            stylo.setWidthF(
+                2
+            )
+
+            # 5 bandes
+            for numero in range(
+                    -2,
+                    3
+            ):
+                decalage = numero * 4
+
+                centre_x = (
+                        position.get_x()
+                        + route_x * decalage
+                )
+
+                centre_y = (
+                        position.get_y()
+                        + route_y * decalage
+                )
+
+                longueur = 10
+
+                x1 = (
+                        centre_x
+                        - perpendiculaire_x
+                        * longueur
+                )
+
+                y1 = (
+                        centre_y
+                        - perpendiculaire_y
+                        * longueur
+                )
+
+                x2 = (
+                        centre_x
+                        + perpendiculaire_x
+                        * longueur
+                )
+
+                y2 = (
+                        centre_y
+                        + perpendiculaire_y
+                        * longueur
+                )
+
+                self.__scene.addLine(
+                    x1,
+                    y1,
+                    x2,
+                    y2,
+                    stylo
                 )

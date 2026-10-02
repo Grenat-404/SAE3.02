@@ -1,5 +1,5 @@
 import time
-
+import math
 from src.model.feu import Feu
 from src.model.vehicule_prioritaire import VehiculePrioritaire
 
@@ -513,6 +513,44 @@ class Simulation:
             feu.passer_au_rouge()
 
     def __appliquer_phase_feux(self):
+        feux_osm = []
+
+        for feu in self.__carte.get_feux():
+
+            if feu.est_osm():
+                feux_osm.append(
+                    feu
+                )
+
+        # ==================================================
+        # FEUX OPENSTREETMAP
+        # ==================================================
+
+        if len(feux_osm) > 0:
+
+            if self.__phase_feux == "nord_sud":
+                groupe_vert = 0
+
+            else:
+                groupe_vert = 1
+
+            for feu in feux_osm:
+
+                if (
+                        feu.get_groupe()
+                        == groupe_vert
+                ):
+                    feu.passer_au_vert()
+
+                else:
+                    feu.passer_au_rouge()
+
+            return
+
+        # ==================================================
+        # FEUX MANUELS
+        # ==================================================
+
         for feu in self.__carte.get_feux():
 
             direction = feu.get_direction()
@@ -520,8 +558,8 @@ class Simulation:
             if self.__phase_feux == "nord_sud":
 
                 if (
-                    direction == "nord"
-                    or direction == "sud"
+                        direction == "nord"
+                        or direction == "sud"
                 ):
                     feu.passer_au_vert()
 
@@ -531,8 +569,8 @@ class Simulation:
             elif self.__phase_feux == "est_ouest":
 
                 if (
-                    direction == "est"
-                    or direction == "ouest"
+                        direction == "est"
+                        or direction == "ouest"
                 ):
                     feu.passer_au_vert()
 
@@ -552,6 +590,10 @@ class Simulation:
     # --------------------------------------------------
 
     def __doit_s_arreter_au_feu(self, vehicule):
+        if vehicule.a_itineraire():
+            return self.__doit_s_arreter_au_feu_osm(
+                vehicule
+            )
         forcer_arret = (
             self.__vehicule_en_attente_priorite(
                 vehicule
@@ -666,11 +708,132 @@ class Simulation:
 
         return False
 
+    def __doit_s_arreter_au_feu_osm(
+            self,
+            vehicule
+    ):
+        """Arrête un véhicule OSM avant un feu rouge situé devant lui."""
+
+        cible = vehicule.get_point_cible()
+
+        if cible is None:
+            return False
+
+        position = vehicule.get_position()
+
+        x = position.get_x()
+        y = position.get_y()
+
+        cible_x = cible.get_x()
+        cible_y = cible.get_y()
+
+        segment_x = (
+                cible_x - x
+        )
+
+        segment_y = (
+                cible_y - y
+        )
+
+        longueur_segment_carree = (
+                segment_x * segment_x
+                + segment_y * segment_y
+        )
+
+        if longueur_segment_carree == 0:
+            return False
+
+        for feu in self.__carte.get_feux():
+
+            if not feu.est_osm():
+                continue
+
+            if feu.get_etat() != Feu.ROUGE:
+                continue
+
+            position_feu = (
+                feu.get_position()
+            )
+
+            feu_x = (
+                position_feu.get_x()
+            )
+
+            feu_y = (
+                position_feu.get_y()
+            )
+
+            vers_feu_x = (
+                    feu_x - x
+            )
+
+            vers_feu_y = (
+                    feu_y - y
+            )
+
+            # Projection du feu sur le segment
+            t = (
+                    (
+                            vers_feu_x * segment_x
+                            + vers_feu_y * segment_y
+                    )
+                    / longueur_segment_carree
+            )
+
+            # Le feu n'est pas devant le véhicule.
+            if t < 0 or t > 1:
+                continue
+
+            projection_x = (
+                    x
+                    + t * segment_x
+            )
+
+            projection_y = (
+                    y
+                    + t * segment_y
+            )
+
+            distance_route = math.sqrt(
+                (
+                        feu_x - projection_x
+                ) ** 2
+                +
+                (
+                        feu_y - projection_y
+                ) ** 2
+            )
+
+            # Le feu doit être suffisamment proche
+            # de la route suivie.
+            if distance_route > 15:
+                continue
+
+            distance_feu = math.sqrt(
+                (
+                        projection_x - x
+                ) ** 2
+                +
+                (
+                        projection_y - y
+                ) ** 2
+            )
+
+            # Distance d'arrêt simple.
+            if distance_feu <= 30:
+                return True
+
+        return False
+
     # --------------------------------------------------
     # DISTANCE ENTRE VEHICULES
     # --------------------------------------------------
 
     def __vehicule_trop_proche(self, vehicule):
+        if vehicule.a_itineraire():
+            return self.__vehicule_osm_trop_proche(
+                vehicule
+            )
         for autre in self.__vehicules:
 
             if autre == vehicule:
@@ -794,6 +957,49 @@ class Simulation:
                         < self.__distance_minimale
                     ):
                         return True
+
+        return False
+
+    def __vehicule_osm_trop_proche(
+            self,
+            vehicule
+    ):
+        """Vérification simple de distance entre véhicules OSM."""
+
+        position = vehicule.get_position()
+
+        for autre in self.__vehicules:
+
+            if autre == vehicule:
+                continue
+
+            if not autre.a_itineraire():
+                continue
+
+            autre_position = (
+                autre.get_position()
+            )
+
+            dx = (
+                    autre_position.get_x()
+                    - position.get_x()
+            )
+
+            dy = (
+                    autre_position.get_y()
+                    - position.get_y()
+            )
+
+            distance = math.sqrt(
+                dx * dx
+                + dy * dy
+            )
+
+            if (
+                    distance
+                    < self.__distance_minimale + 10
+            ):
+                return True
 
         return False
 
