@@ -1,12 +1,13 @@
 import random
 
 class Vehicule:
-    def __init__(self, x, y, vitesse, direction):
+    def __init__(self, x, y, vitesse, direction, destination=None):
         self.__x = x
         self.__y = y
         self.__vitesse = float(vitesse)
         self.__direction = direction
         self.__couleur = random.choice(["green", "yellow", "cyan", "magenta", "darkCyan", "darkMagenta", "darkYellow"])
+        self.__destination = destination
 
     def get_couleur(self):
         return self.__couleur
@@ -35,11 +36,17 @@ class Vehicule:
         l, h = self.get_dimensions()
         return h
 
+    def get_destination(self):
+        return self.__destination
+
     def set_x(self, valeur):
         self.__x = valeur
 
     def set_y(self, valeur):
         self.__y = valeur
+
+    def set_direction(self, nouvelle_direction):
+        self.__direction = nouvelle_direction
 
     def avancer(self, vitesse_calculee = None):
 

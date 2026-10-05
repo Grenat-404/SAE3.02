@@ -57,7 +57,7 @@ class Simulation:
         self.__hauteur_ecran = hauteur_ecran
 
         voiture1 = Vehicule(self.__spawn_pos["droite"]["x"], self.__spawn_pos["droite"]["y"], 4, "droite")
-        voiture2 = Vehicule(self.__spawn_pos["gauche"]["x"], self.__spawn_pos["gauche"]["y"], 4, "gauche")
+        voiture2 = Vehicule(self.__spawn_pos["gauche"]["x"], self.__spawn_pos["gauche"]["y"], 4, "gauche", "haut")
         voiture3 = Vehicule(self.__spawn_pos["bas"]["x"], self.__spawn_pos["bas"]["y"], 4, "bas")
         voiture4 = Vehicule(self.__spawn_pos["haut"]["x"], self.__spawn_pos["haut"]["y"], 4, "haut")
 
@@ -65,6 +65,7 @@ class Simulation:
         self.__vehicules.append(voiture2)
         self.__vehicules.append(voiture3)
         self.__vehicules.append(voiture4)
+
 
     def get_routes(self):
         return self.__routes
@@ -79,22 +80,26 @@ class Simulation:
         if random.randint(1, 30) == 1 and len(self.__vehicules) < 25:
             directions = ["droite", "gauche", "bas", "haut"]
             direction = random.choice(directions)
-            vitesse = random.uniform(3, 5)
+            vitesse = random.uniform(3, 4)
 
             spawn_pos = self.__spawn_pos[direction]
             x, y = spawn_pos["x"], spawn_pos["y"]
 
             if direction in ("droite", "gauche"):
                 y += random.randint(-5, 5)
+                destinations = [None, None, "bas", "haut"]
+                destination = random.choice(destinations)
             else:
                 x += random.randint(-5, 5)
+                destinations = [None, None, "droite", "gauche"]
+                destination = random.choice(destinations)
 
             for v in self.__vehicules:
                 if v.get_direction() == direction:
                     if abs(v.get_x() - x) < 40 and abs(v.get_y() - y) < 40:
                         return
 
-            voiture = Vehicule(x, y, vitesse, direction)
+            voiture = Vehicule(x, y, vitesse, direction, destination)
             self.__vehicules.append(voiture)
 
             # Mettre à jour la position de spawn pour le prochain véhicule
@@ -157,8 +162,6 @@ class Simulation:
     def avancer(self):
         self.feux_sync()
 
-
-        # Arrete des vehicules en fonction de son environement
         for vehicule in self.__vehicules:
             doit_s_arreter = False
 
@@ -169,6 +172,16 @@ class Simulation:
                         if vehicule.get_x() + vehicule.get_vitesse() >= position_arret:
                             vehicule.set_x(position_arret)
                             doit_s_arreter = True
+                if vehicule.get_destination() == "haut":
+                    centre_voie_haut = self.__intersection.get_x() + self.__intersection.get_largeur() * 3 // 4
+                    if vehicule.get_x() >= centre_voie_haut:
+                        vehicule.set_x(centre_voie_haut)
+                        vehicule.set_direction("haut")
+                if vehicule.get_destination() == "bas":
+                    centre_voie_bas = self.__intersection.get_x() + self.__intersection.get_largeur()  // 4
+                    if vehicule.get_x() >= centre_voie_bas:
+                        vehicule.set_x(centre_voie_bas)
+                        vehicule.set_direction("bas")
 
             elif vehicule.get_direction() == "gauche":
                 position_arret = self.__intersection.get_x() + self.__intersection.get_largeur()
@@ -177,6 +190,16 @@ class Simulation:
                         if vehicule.get_x() - vehicule.get_vitesse() <= position_arret:
                             vehicule.set_x(position_arret)
                             doit_s_arreter = True
+                if vehicule.get_destination() == "haut":
+                    centre_voie_haut = self.__intersection.get_x() + self.__intersection.get_largeur() * 3 // 4
+                    if vehicule.get_x() <= centre_voie_haut:
+                        vehicule.set_x(centre_voie_haut)
+                        vehicule.set_direction("haut")
+                if vehicule.get_destination() == "bas":
+                    centre_voie_bas = self.__intersection.get_x() + self.__intersection.get_largeur() // 4
+                    if vehicule.get_x() <= centre_voie_bas:
+                        vehicule.set_x(centre_voie_bas)
+                        vehicule.set_direction("bas")
 
             elif vehicule.get_direction() == "bas":
                 position_arret = self.__intersection.get_y() - 30
@@ -185,6 +208,17 @@ class Simulation:
                         if vehicule.get_y() + vehicule.get_vitesse() >= position_arret:
                             vehicule.set_y(position_arret)
                             doit_s_arreter = True
+                if vehicule.get_destination() == "droite":
+                    centre_voie_droite = self.__intersection.get_y() + self.__intersection.get_hauteur() * 3 // 4
+                    if vehicule.get_y() <= centre_voie_droite:
+                        vehicule.set_y(centre_voie_droite)
+                        vehicule.set_direction("droite")
+                if vehicule.get_destination() == "gauche":
+                    centre_voie_gauche = self.__intersection.get_y() + self.__intersection.get_hauteur() // 4
+                    if vehicule.get_y() <= centre_voie_gauche:
+                        vehicule.set_y(centre_voie_gauche)
+                        vehicule.set_direction("gauche")
+
 
             elif vehicule.get_direction() == "haut":
                 position_arret = self.__intersection.get_y() + self.__intersection.get_hauteur()
@@ -193,6 +227,16 @@ class Simulation:
                         if vehicule.get_y() - vehicule.get_vitesse() <= position_arret:
                             vehicule.set_y(position_arret)
                             doit_s_arreter = True
+                if vehicule.get_destination() == "droite":
+                    centre_voie_droite = self.__intersection.get_y() + self.__intersection.get_hauteur() * 3 // 4
+                    if vehicule.get_y() <= centre_voie_droite:
+                        vehicule.set_y(centre_voie_droite)
+                        vehicule.set_direction("droite")
+                if vehicule.get_destination() == "gauche":
+                    centre_voie_gauche = self.__intersection.get_y() + self.__intersection.get_hauteur() // 4
+                    if vehicule.get_y() <= centre_voie_gauche:
+                        vehicule.set_y(centre_voie_gauche)
+                        vehicule.set_direction("gauche")
 
             for autre in self.__vehicules:
                 if autre is vehicule:
@@ -206,7 +250,6 @@ class Simulation:
                         if autre.get_x() - vehicule.get_x() < seuil:
                             doit_s_arreter = True
 
-
                 elif vehicule.get_direction() == "gauche":
                     if autre.get_x() < vehicule.get_x():
                         if vehicule.get_x() - autre.get_x() < seuil:
@@ -216,7 +259,6 @@ class Simulation:
                     if autre.get_y() > vehicule.get_y():
                         if autre.get_y() - vehicule.get_y() < seuil:
                             doit_s_arreter = True
-
 
                 elif vehicule.get_direction() == "haut":
                     if autre.get_y() < vehicule.get_y():
