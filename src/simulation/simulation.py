@@ -23,12 +23,12 @@ class Simulation:
         self.__intersection = Intersection(340, 250, 120, 120)
 
         # Feux de la route horizontale
-        self.__feu_droite = Feu(460, 180, "vert")
-        self.__feu_gauche = Feu(330, 390, "vert")
+        self.__feu_droite = Feu(460, 228, "vert", "verticale", False)
+        self.__feu_gauche = Feu(282, 370, "vert", "verticale", True)
 
         # Feux de la route verticale
-        self.__feu_bas = Feu(320, 210, "rouge")
-        self.__feu_haut = Feu(460, 390, "rouge")
+        self.__feu_bas = Feu(460, 370, "rouge", "horizontale", False)
+        self.__feu_haut = Feu(318, 192, "rouge", "horizontale", True)
 
         # Liste des feux pour faciliter leur affichage
         self.__feux = []
@@ -100,7 +100,6 @@ class Simulation:
 
     def feux_sync(self):
         self.__time_remaining -= 1
-        print(self.__time_remaining, self.__cycle_state)
 
         if self.__time_remaining <= 0:
             if self.__cycle_state == "horizontal_vert":
@@ -184,7 +183,7 @@ class Simulation:
                     continue
                 if autre.get_direction() != vehicule.get_direction():
                     continue
-                seuil = 50  # distance minimale à garder, en pixels
+                seuil = 45
 
                 if vehicule.get_direction() == "droite":
                     if autre.get_x() > vehicule.get_x():

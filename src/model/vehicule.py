@@ -1,10 +1,15 @@
+import random
+
 class Vehicule:
     def __init__(self, x, y, vitesse, direction):
         self.__x = x
         self.__y = y
         self.__vitesse = float(vitesse)
         self.__direction = direction
+        self.__couleur = random.choice(["green", "yellow", "cyan", "magenta", "darkCyan", "darkMagenta", "darkYellow"])
 
+    def get_couleur(self):
+        return self.__couleur
     def get_x(self):
         return self.__x
     def get_y(self):
