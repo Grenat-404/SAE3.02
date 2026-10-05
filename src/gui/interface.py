@@ -11,7 +11,7 @@ class Interface(QWidget):
         self.simulation = simulation
 
         self.setWindowTitle("SAE3.02 - Simulation de trafic")
-        self.resize(800, 600)
+        self.showMaximized()
 
         self.timer = QTimer()
         self.timer.timeout.connect(self.mettre_a_jour)
@@ -20,6 +20,10 @@ class Interface(QWidget):
     def mettre_a_jour(self):
         self.simulation.avancer()
         self.update()
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Escape:
+            self.close()
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -36,31 +40,35 @@ class Interface(QWidget):
         painter.setPen(pen)
 
         intersection = self.simulation.get_intersections()
+        centre_x = intersection.get_x() + intersection.get_largeur() // 2
+        centre_y = intersection.get_y() + intersection.get_hauteur() // 2
+        largeur_ecran = self.width()
+        hauteur_ecran = self.height()
 
         # Ligne d'arrêt - sens droite (moitié basse uniquement)
         x_arret_droite = intersection.get_x()
-        painter.drawLine(x_arret_droite, 310, x_arret_droite, 370)
+        painter.drawLine(x_arret_droite, centre_y, x_arret_droite, intersection.get_y() + intersection.get_hauteur())
 
         # Ligne d'arrêt - sens gauche (moitié haute uniquement)
         x_arret_gauche = intersection.get_x() + intersection.get_largeur()
-        painter.drawLine(x_arret_gauche, 250, x_arret_gauche, 310)
+        painter.drawLine(x_arret_gauche, intersection.get_y(), x_arret_gauche, centre_y)
 
         # Ligne d'arrêt - sens bas (moitié gauche uniquement)
         y_arret_bas = intersection.get_y()
-        painter.drawLine(340, y_arret_bas, 400, y_arret_bas)
+        painter.drawLine(intersection.get_x(), y_arret_bas, centre_x, y_arret_bas)
 
         # Ligne d'arrêt - sens haut (moitié droite uniquement)
         y_arret_haut = intersection.get_y() + intersection.get_hauteur()
-        painter.drawLine(400, y_arret_haut, 460, y_arret_haut)
+        painter.drawLine(centre_x, y_arret_haut, intersection.get_x() + intersection.get_largeur(), y_arret_haut)
 
         pen_pointille = QPen(Qt.GlobalColor.white, 2, Qt.PenStyle.DashLine)
         painter.setPen(pen_pointille)
 
-        painter.drawLine(0, 310, intersection.get_x(), 310)
-        painter.drawLine(intersection.get_x() + intersection.get_largeur(), 310, 800, 310)
+        painter.drawLine(0, centre_y, intersection.get_x(), centre_y)
+        painter.drawLine(intersection.get_x() + intersection.get_largeur(), centre_y, largeur_ecran, centre_y)
 
-        painter.drawLine(400, 0, 400, intersection.get_y())
-        painter.drawLine(400, intersection.get_y() + intersection.get_hauteur(), 400, 600)
+        painter.drawLine(centre_x, 0, centre_x, intersection.get_y())
+        painter.drawLine(centre_x, intersection.get_y() + intersection.get_hauteur(), centre_x, hauteur_ecran)
 
         painter.setPen(Qt.PenStyle.NoPen)
 

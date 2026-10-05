@@ -6,11 +6,13 @@ from src.simulation.simulation import Simulation
 from src.gui.interface import Interface
 
 if __name__ == "__main__":
-
     app = QApplication(sys.argv)
-    simulation = Simulation()
 
+    ecran = app.primaryScreen().geometry()
+    largeur_ecran = ecran.width()
+    hauteur_ecran = ecran.height()
+
+    simulation = Simulation(largeur_ecran, hauteur_ecran)
     fenetre = Interface(simulation)
-    fenetre.show()
 
-    app.exec()
+    sys.exit(app.exec())

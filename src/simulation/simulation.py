@@ -5,50 +5,61 @@ from src.model.vehicule import Vehicule
 import random
 
 class Simulation:
-    def __init__(self):
+    def __init__(self, largeur_ecran, hauteur_ecran):
         self.__vehicules = []
         self.__routes = []
 
         self.__cycle_state = "horizontal_vert"
         self.__time_remaining = 100
 
-        # Routes
-        route_horizontale = Route(0, 250, 800, 120)
-        route_verticale = Route(340, 0, 120, 600)
+        largeur_route = 150  # un peu plus grande qu'avant (120)
+
+        centre_x = largeur_ecran // 2
+        centre_y = hauteur_ecran // 2
+
+        # Routes (toujours centrées, quelle que soit la taille de l'écran)
+        route_horizontale = Route(0, centre_y - largeur_route // 2, largeur_ecran, largeur_route)
+        route_verticale = Route(centre_x - largeur_route // 2, 0, largeur_route, hauteur_ecran)
 
         self.__routes.append(route_horizontale)
         self.__routes.append(route_verticale)
 
-        # Intersection
-        self.__intersection = Intersection(340, 250, 120, 120)
+        # Intersection (toujours calée sur le croisement des deux routes)
+        self.__intersection = Intersection(
+            centre_x - largeur_route // 2,
+            centre_y - largeur_route // 2,
+            largeur_route,
+            largeur_route
+        )
 
-        # Feux de la route horizontale
-        self.__feu_droite = Feu(460, 228, "vert", "verticale", False)
-        self.__feu_gauche = Feu(282, 370, "vert", "verticale", True)
+        ix = self.__intersection.get_x()
+        iy = self.__intersection.get_y()
+        il = self.__intersection.get_largeur()
+        ih = self.__intersection.get_hauteur()
 
-        # Feux de la route verticale
-        self.__feu_bas = Feu(460, 370, "rouge", "horizontale", False)
-        self.__feu_haut = Feu(318, 192, "rouge", "horizontale", True)
+        # Feux (positionnés relativement à l'intersection, comme avant)
+        self.__feu_droite = Feu(ix + il, iy - 22, "vert", "verticale", False)
+        self.__feu_gauche = Feu(ix - 58, iy + ih, "vert", "verticale", True)
+        self.__feu_bas = Feu(ix + il, iy + ih, "rouge", "horizontale", False)
+        self.__feu_haut = Feu(ix - 22, iy - 58, "rouge", "horizontale", True)
 
-        # Liste des feux pour faciliter leur affichage
-        self.__feux = []
+        self.__feux = [self.__feu_droite, self.__feu_gauche, self.__feu_bas, self.__feu_haut]
 
-        self.__feux.append(self.__feu_droite)
-        self.__feux.append(self.__feu_gauche)
-        self.__feux.append(self.__feu_bas)
-        self.__feux.append(self.__feu_haut)
-
+        # Points de spawn (bords de l'écran, calés sur la bonne demi-voie)
         self.__spawn_pos = {
-            "droite": {"x": 50, "y": 320},
-            "gauche": {"x": 750, "y": 280},
-            "bas": {"x": 370, "y": 0},
-            "haut": {"x": 410, "y": 600}
+            "droite": {"x": 20, "y": iy + ih * 3 // 4},
+            "gauche": {"x": largeur_ecran - 20, "y": iy + ih // 4},
+            "bas": {"x": ix + il // 4, "y": 0},
+            "haut": {"x": ix + il * 3 // 4, "y": hauteur_ecran}
         }
 
-        voiture1 = Vehicule(50, 320, 4, "droite")
-        voiture2 = Vehicule(700, 280, 4, "gauche")
-        voiture3 = Vehicule(370, 50, 4, "bas")
-        voiture4 = Vehicule(410, 500, 4, "haut")
+        self.__largeur_ecran = largeur_ecran
+        self.__hauteur_ecran = hauteur_ecran
+
+        voiture1 = Vehicule(self.__spawn_pos["droite"]["x"], self.__spawn_pos["droite"]["y"], 4, "droite")
+        voiture2 = Vehicule(self.__spawn_pos["gauche"]["x"], self.__spawn_pos["gauche"]["y"], 4, "gauche")
+        voiture3 = Vehicule(self.__spawn_pos["bas"]["x"], self.__spawn_pos["bas"]["y"], 4, "bas")
+        voiture4 = Vehicule(self.__spawn_pos["haut"]["x"], self.__spawn_pos["haut"]["y"], 4, "haut")
 
         self.__vehicules.append(voiture1)
         self.__vehicules.append(voiture2)
@@ -73,6 +84,11 @@ class Simulation:
             spawn_pos = self.__spawn_pos[direction]
             x, y = spawn_pos["x"], spawn_pos["y"]
 
+            if direction in ("droite", "gauche"):
+                y += random.randint(-5, 5)
+            else:
+                x += random.randint(-5, 5)
+
             for v in self.__vehicules:
                 if v.get_direction() == direction:
                     if abs(v.get_x() - x) < 40 and abs(v.get_y() - y) < 40:
@@ -94,7 +110,7 @@ class Simulation:
     def despawn_vehicles(self):
         vehicules_a_garder = []
         for vehicule in self.__vehicules:
-            if 0 <= vehicule.get_x() <= 800 and 0 <= vehicule.get_y() <= 600:
+            if 0 <= vehicule.get_x() <= self.__largeur_ecran and 0 <= vehicule.get_y() <= self.__hauteur_ecran:
                 vehicules_a_garder.append(vehicule)
         self.__vehicules = vehicules_a_garder
 
