@@ -152,3 +152,25 @@ class UrgenceDB:
             urgences.append(urgence)
 
         return urgences
+
+    def get_prochain_identifiant(self):
+        """Retourne un nouvel identifiant disponible pour une urgence."""
+
+        connexion = sqlite3.connect(
+            self.__chemin_db
+        )
+
+        curseur = connexion.cursor()
+
+        curseur.execute(
+            """
+            SELECT COALESCE(MAX(id), 0) + 1
+            FROM urgences
+            """
+        )
+
+        resultat = curseur.fetchone()
+
+        connexion.close()
+
+        return resultat[0]

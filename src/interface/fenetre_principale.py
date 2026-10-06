@@ -1,12 +1,23 @@
-from PyQt6.QtCore import QTimer
-from PyQt6.QtWidgets import QMainWindow
+from PyQt6.QtCore import QTimer, Qt
+
+from PyQt6.QtWidgets import (
+    QMainWindow,
+    QDockWidget,
+    QWidget,
+    QVBoxLayout,
+    QLabel,
+    QComboBox,
+    QSpinBox,
+    QPushButton,
+    QListWidget,
+    QToolBar
+)
 
 from src.model.position import Position
 from src.model.route import Route
 from src.model.intersection import Intersection
 from src.model.carte import Carte
 from src.model.vehicule import Vehicule
-from src.model.vehicule_prioritaire import VehiculePrioritaire
 from src.model.feu import Feu
 
 from src.simulation.simulation import Simulation
@@ -18,6 +29,7 @@ from src.reseau.client import Client
 
 from src.model.urgence import Urgence
 from src.database.urgence_db import UrgenceDB
+
 
 class FenetrePrincipale(QMainWindow):
     """Fenêtre principale de la simulation."""
@@ -52,9 +64,13 @@ class FenetrePrincipale(QMainWindow):
         self.__serveur.demarrer()
 
         self.__urgence_db = UrgenceDB()
-        self.__creer_urgences_demo()
+        self.__vehicules_urgence_en_attente = []
+
+        self.__creer_panneau_urgences()
+        self.__creer_barre_outils()
 
         self.__creer_vehicules()
+        self.__simulation.activer_trafic_automatique()
 
         self.statusBar().showMessage(
             "Serveur V2I actif sur 127.0.0.1:5000"
@@ -208,54 +224,6 @@ class FenetrePrincipale(QMainWindow):
         )
 
         # --------------------------------------------------
-        # VEHICULES PRIORITAIRES
-        # --------------------------------------------------
-
-        # Ambulance appartenant à l'accident grave.
-        # Priorité récupérée depuis SQLite.
-        ambulance = VehiculePrioritaire(
-            5,
-            Position(530, 700),
-            2.5,
-            "nord",
-            "ambulance",
-            accident.get_niveau_priorite(),
-            largeur=20,
-            hauteur=30,
-            urgence_id=accident.get_identifiant()
-        )
-
-        # Pompier appartenant à la même urgence
-        # que l'ambulance.
-        pompier = VehiculePrioritaire(
-            6,
-            Position(50, 335),
-            2,
-            "est",
-            "pompier",
-            accident.get_niveau_priorite(),
-            largeur=30,
-            hauteur=20,
-            urgence_id=accident.get_identifiant()
-        )
-
-        # Véhicule de police appartenant
-        # à une autre urgence.
-        police = VehiculePrioritaire(
-            7,
-            Position(455, 20),
-            2,
-            "sud",
-            "police",
-            intervention_police.get_niveau_priorite(),
-            largeur=20,
-            hauteur=30,
-            urgence_id=(
-                intervention_police.get_identifiant()
-            )
-        )
-
-        # --------------------------------------------------
         # AJOUT DES VEHICULES A LA SIMULATION
         # --------------------------------------------------
 
@@ -273,18 +241,6 @@ class FenetrePrincipale(QMainWindow):
 
         self.__simulation.ajouter_vehicule(
             vehicule4
-        )
-
-        self.__simulation.ajouter_vehicule(
-            ambulance
-        )
-
-        self.__simulation.ajouter_vehicule(
-            pompier
-        )
-
-        self.__simulation.ajouter_vehicule(
-            police
         )
 
         # --------------------------------------------------
@@ -357,35 +313,436 @@ class FenetrePrincipale(QMainWindow):
                 message
             )
 
-    def __creer_urgences_demo(self):
-        accident = Urgence(
+    def __creer_panneau_urgences(self):
+        """Crée le panneau permettant de déclencher une urgence."""
+
+        self.__dock_urgences = QDockWidget(
+            "Nouvelle urgence",
+            self
+        )
+
+        self.__dock_urgences.setObjectName(
+            "dock_urgences"
+        )
+
+        self.__dock_urgences.setObjectName(
+            "dock_urgences"
+        )
+
+        self.__dock_urgences.setAllowedAreas(
+            Qt.DockWidgetArea.LeftDockWidgetArea
+            |
+            Qt.DockWidgetArea.RightDockWidgetArea
+        )
+
+        contenu = QWidget()
+
+        layout = QVBoxLayout(
+            contenu
+        )
+
+        # --------------------------------------------------
+        # TYPE D'URGENCE
+        # --------------------------------------------------
+
+        layout.addWidget(
+            QLabel(
+                "Type d'urgence :"
+            )
+        )
+
+        self.__combo_type_urgence = QComboBox()
+
+        self.__combo_type_urgence.setEditable(
+            True
+        )
+
+        self.__combo_type_urgence.addItems(
+            [
+                "Accident",
+                "Accident grave",
+                "Incendie",
+                "Secours à personne",
+                "Intervention police"
+            ]
+        )
+
+        layout.addWidget(
+            self.__combo_type_urgence
+        )
+
+        # --------------------------------------------------
+        # NIVEAU
+        # --------------------------------------------------
+
+        layout.addWidget(
+            QLabel(
+                "Niveau de priorité :"
+            )
+        )
+
+        self.__spin_priorite = QSpinBox()
+
+        self.__spin_priorite.setRange(
             1,
-            "accident_grave",
-            3,
-            [
-                "ambulance",
-                "pompier"
-            ],
-            2
+            5
         )
 
-        intervention_police = Urgence(
-            2,
-            "intervention_police",
-            2,
-            [
-                "police"
-            ],
-            1
+        self.__spin_priorite.setValue(
+            3
+        )
+
+        layout.addWidget(
+            self.__spin_priorite
+        )
+
+        # --------------------------------------------------
+        # VEHICULE
+        # --------------------------------------------------
+
+        layout.addWidget(
+            QLabel(
+                "Type de véhicule :"
+            )
+        )
+
+        self.__combo_service = QComboBox()
+
+        self.__combo_service.addItem(
+            "Ambulance",
+            "ambulance"
+        )
+
+        self.__combo_service.addItem(
+            "Pompier",
+            "pompier"
+        )
+
+        self.__combo_service.addItem(
+            "Police",
+            "police"
+        )
+
+        layout.addWidget(
+            self.__combo_service
+        )
+
+        # --------------------------------------------------
+        # PROVENANCE
+        # --------------------------------------------------
+
+        layout.addWidget(
+            QLabel(
+                "Le véhicule vient de :"
+            )
+        )
+
+        self.__combo_provenance = QComboBox()
+
+        # Attention :
+        # s'il vient du Nord, il se déplace vers le Sud.
+        self.__combo_provenance.addItem(
+            "Nord",
+            "sud"
+        )
+
+        self.__combo_provenance.addItem(
+            "Sud",
+            "nord"
+        )
+
+        self.__combo_provenance.addItem(
+            "Est",
+            "ouest"
+        )
+
+        self.__combo_provenance.addItem(
+            "Ouest",
+            "est"
+        )
+
+        layout.addWidget(
+            self.__combo_provenance
+        )
+
+        # --------------------------------------------------
+        # AJOUT
+        # --------------------------------------------------
+
+        bouton_ajouter = QPushButton(
+            "Ajouter ce véhicule"
+        )
+
+        bouton_ajouter.clicked.connect(
+            self.__ajouter_vehicule_urgence
+        )
+
+        layout.addWidget(
+            bouton_ajouter
+        )
+
+        # --------------------------------------------------
+        # LISTE
+        # --------------------------------------------------
+
+        layout.addWidget(
+            QLabel(
+                "Véhicules nécessaires :"
+            )
+        )
+
+        self.__liste_vehicules_urgence = (
+            QListWidget()
+        )
+
+        layout.addWidget(
+            self.__liste_vehicules_urgence
+        )
+
+        # --------------------------------------------------
+        # DECLENCHEMENT
+        # --------------------------------------------------
+
+        bouton_declencher = QPushButton(
+            "Déclencher l'urgence"
+        )
+
+        bouton_declencher.clicked.connect(
+            self.__declencher_urgence
+        )
+
+        layout.addWidget(
+            bouton_declencher
+        )
+
+        bouton_vider = QPushButton(
+            "Vider la préparation"
+        )
+
+        bouton_vider.clicked.connect(
+            self.__vider_urgence_en_preparation
+        )
+
+        layout.addWidget(
+            bouton_vider
+        )
+
+        layout.addStretch()
+
+        self.__dock_urgences.setWidget(
+            contenu
+        )
+
+        self.addDockWidget(
+            Qt.DockWidgetArea.RightDockWidgetArea,
+            self.__dock_urgences
+        )
+
+    def __ajouter_vehicule_urgence(self):
+        """Ajoute un véhicule à l'urgence en préparation."""
+
+        type_service = (
+            self.__combo_service.currentData()
+        )
+
+        nom_service = (
+            self.__combo_service.currentText()
+        )
+
+        direction = (
+            self.__combo_provenance.currentData()
+        )
+
+        provenance = (
+            self.__combo_provenance.currentText()
+        )
+
+        configuration = {
+            "service": type_service,
+            "direction": direction,
+            "provenance": provenance
+        }
+
+        self.__vehicules_urgence_en_attente.append(
+            configuration
+        )
+
+        texte = (
+            f"{nom_service} "
+            f"- vient de {provenance}"
+        )
+
+        self.__liste_vehicules_urgence.addItem(
+            texte
+        )
+
+        self.statusBar().showMessage(
+            "Véhicule ajouté à l'urgence.",
+            3000
+        )
+
+    def __creer_barre_outils(self):
+        """Crée la barre d'outils de l'application."""
+
+        barre_outils = QToolBar(
+            "Outils",
+            self
+        )
+
+        self.addToolBar(
+            barre_outils
+        )
+
+        action_urgences = (
+            self.__dock_urgences.toggleViewAction()
+        )
+
+        action_urgences.setText(
+            "Urgences"
+        )
+
+        barre_outils.addAction(
+            action_urgences
+        )
+
+    def __declencher_urgence(self):
+        """Crée l'urgence et fait apparaître ses véhicules."""
+
+        if (
+                len(
+                    self.__vehicules_urgence_en_attente
+                )
+                == 0
+        ):
+            self.statusBar().showMessage(
+                "Ajoute au moins un véhicule.",
+                4000
+            )
+
+            return
+
+        type_urgence = (
+            self.__combo_type_urgence.currentText()
+            .strip()
+        )
+
+        if type_urgence == "":
+            self.statusBar().showMessage(
+                "Le type d'urgence est obligatoire.",
+                4000
+            )
+
+            return
+
+        niveau_priorite = (
+            self.__spin_priorite.value()
+        )
+
+        urgence_id = (
+            self.__urgence_db
+            .get_prochain_identifiant()
+        )
+
+        # --------------------------------------------------
+        # SERVICES NECESSAIRES
+        # --------------------------------------------------
+
+        services = []
+
+        for configuration in (
+                self.__vehicules_urgence_en_attente
+        ):
+
+            service = configuration[
+                "service"
+            ]
+
+            if service not in services:
+                services.append(
+                    service
+                )
+
+        # --------------------------------------------------
+        # CREATION DE L'URGENCE
+        # --------------------------------------------------
+
+        urgence = Urgence(
+            urgence_id,
+            type_urgence,
+            niveau_priorite,
+            services,
+            len(
+                self.__vehicules_urgence_en_attente
+            )
         )
 
         self.__urgence_db.ajouter_urgence(
-            accident
+            urgence
         )
 
-        self.__urgence_db.ajouter_urgence(
-            intervention_police
+        # --------------------------------------------------
+        # CREATION DES VEHICULES
+        # --------------------------------------------------
+
+        nombre_par_direction = {}
+
+        for configuration in (
+                self.__vehicules_urgence_en_attente
+        ):
+
+            direction = configuration[
+                "direction"
+            ]
+
+            decalage = nombre_par_direction.get(
+                direction,
+                0
+            )
+
+            vehicule = (
+                self.__simulation
+                .ajouter_vehicule_prioritaire(
+                    configuration["service"],
+                    direction,
+                    niveau_priorite,
+                    urgence_id,
+                    decalage
+                )
+            )
+
+            if vehicule is not None:
+                self.__vue.ajouter_vehicule(
+                    vehicule
+                )
+
+            nombre_par_direction[
+                direction
+            ] = decalage + 1
+
+        # --------------------------------------------------
+        # MESSAGE
+        # --------------------------------------------------
+
+        nombre = len(
+            self.__vehicules_urgence_en_attente
         )
+
+        self.statusBar().showMessage(
+            f"Urgence #{urgence_id} déclenchée : "
+            f"{type_urgence} - "
+            f"priorité {niveau_priorite} - "
+            f"{nombre} véhicule(s)",
+            6000
+        )
+
+        self.__vider_urgence_en_preparation()
+
+    def __vider_urgence_en_preparation(self):
+        """Vide les véhicules de l'urgence en préparation."""
+
+        self.__vehicules_urgence_en_attente.clear()
+
+        self.__liste_vehicules_urgence.clear()
 
     def closeEvent(self, event):
         """Arrête proprement la simulation et le serveur."""

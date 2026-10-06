@@ -2,9 +2,15 @@ class Feu:
     """Représente un feu de circulation."""
 
     ROUGE = "rouge"
+    ORANGE = "orange"
     VERT = "vert"
 
-    def __init__(self, identifiant, direction, etat=ROUGE):
+    def __init__(
+        self,
+        identifiant,
+        direction,
+        etat=ROUGE
+    ):
         self.__identifiant = identifiant
         self.__direction = direction
         self.__etat = etat
@@ -23,6 +29,9 @@ class Feu:
 
     def passer_au_rouge(self):
         self.__etat = Feu.ROUGE
+
+    def passer_a_orange(self):
+        self.__etat = Feu.ORANGE
 
     def passer_au_vert(self):
         self.__etat = Feu.VERT
