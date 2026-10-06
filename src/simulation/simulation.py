@@ -120,7 +120,7 @@ class Simulation:
         self.__vehicules = vehicules_a_garder
 
     def voie_libre(self, vehicule):
-        seuil = 60
+        seuil = 70
 
         for autre in self.__vehicules:
             if autre is vehicule:
@@ -136,49 +136,31 @@ class Simulation:
 
             # VOITURE QUI VA DU HAUT VERS LE BAS
             elif vehicule.get_direction() == "haut":
-
-                # Une voiture venant du bas
                 if autre.get_direction() == "bas":
-
                     if abs(autre.get_y() - vehicule.get_y()) < seuil:
-
-                        # gauche ou tout droit = priorité à l'autre
                         if autre.get_destination() in (None, "droite"):
                             continue
-
-                        # droite = bloque notre virage à gauche
                         if autre.get_destination() == "gauche":
                             return False
 
             # GAUCHE -> DROITE
             elif vehicule.get_direction() == "droite":
-
                 if autre.get_direction() == "gauche":
-
                     if abs(autre.get_x() - vehicule.get_x()) < seuil:
-
-                        # L'autre va tout droit ou dans son virage
-                        # qui ne coupe pas notre trajectoire
                         if autre.get_destination() in (None, "bas"):
                             continue
-
                         if autre.get_destination() == "haut":
                             return False
-
             # DROITE -> GAUCHE
             elif vehicule.get_direction() == "gauche":
-
                 if autre.get_direction() == "droite":
-
                     if abs(autre.get_x() - vehicule.get_x()) < seuil:
-
                         if autre.get_destination() in (None, "haut"):
                             continue
-
                         if autre.get_destination() == "bas":
                             return False
-
         return True
+
     def feux_sync(self):
         self.__time_remaining -= 1
 
@@ -360,7 +342,7 @@ class Simulation:
 
                 if devant:
                     distance = (dx ** 2 + dy ** 2) ** 0.5
-                    if distance < 35:
+                    if distance < 40:
                         doit_s_arreter = True
             if not doit_s_arreter:
                 vehicule.avancer()
