@@ -8,7 +8,14 @@ class Vehicule:
         self.__direction = direction
         self.__couleur = random.choice(["green", "yellow", "cyan", "magenta", "darkCyan", "darkMagenta", "darkYellow"])
         self.__destination = destination
+        self.__ticks_bloque = 0
 
+    def incrementer_blocage(self):
+        self.__ticks_bloque += 1
+    def reset_blocage(self):
+        self.__ticks_bloque = 0
+    def get_ticks_bloque(self):
+        return self.__ticks_bloque
     def get_couleur(self):
         return self.__couleur
     def get_x(self):
@@ -47,6 +54,9 @@ class Vehicule:
 
     def set_direction(self, nouvelle_direction):
         self.__direction = nouvelle_direction
+
+    def set_destination(self, destination):
+        self.__destination = destination
 
     def avancer(self, vitesse_calculee = None):
 
