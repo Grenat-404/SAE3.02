@@ -9,6 +9,11 @@ class Vehicule:
         self.__couleur = random.choice(["green", "yellow", "cyan", "magenta", "darkCyan", "darkMagenta", "darkYellow"])
         self.__destination = destination
         self.__ticks_bloque = 0
+        self.__etat = "route"  # "route", "entrant", "gare", "sortant"
+        self.__trajet = []
+        self.__place = None
+        self.__timer = 0
+        self.__veut_se_garer = False
 
     def incrementer_blocage(self):
         self.__ticks_bloque += 1
@@ -45,6 +50,31 @@ class Vehicule:
 
     def get_destination(self):
         return self.__destination
+
+    def get_etat(self):
+        return self.__etat
+    def set_etat(self, etat):
+        self.__etat = etat
+
+    def get_trajet(self):
+        return self.__trajet
+    def set_trajet(self, trajet):
+        self.__trajet = trajet
+
+    def get_place(self):
+        return self.__place
+    def set_place(self, place):
+        self.__place = place
+
+    def get_timer(self):
+        return self.__timer
+    def set_timer(self, timer):
+        self.__timer = timer
+
+    def get_veut_se_garer(self):
+        return self.__veut_se_garer
+    def set_veut_se_garer(self, valeur):
+        self.__veut_se_garer = valeur
 
     def set_x(self, valeur):
         self.__x = valeur
