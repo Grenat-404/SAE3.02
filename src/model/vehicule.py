@@ -15,6 +15,23 @@ class Vehicule:
         self.__timer = 0
         self.__veut_se_garer = False
 
+        # Gestion de l'écartement pour les urgences
+        self.__ecartement_urgence = False
+        self.__decalage_lateral = 0
+
+        self.__decalage_max = 28
+        self.__vitesse_decalage = 2
+
+        # Position normale sur la voie
+        if direction in ("droite", "gauche"):
+            self.__position_laterale_reference = y
+        else:
+            self.__position_laterale_reference = x
+
+    # --------------------------------------------------
+    # BLOCAGE
+    # --------------------------------------------------
+
     def incrementer_blocage(self):
         self.__ticks_bloque += 1
     def reset_blocage(self):
@@ -88,9 +105,70 @@ class Vehicule:
     def set_destination(self, destination):
         self.__destination = destination
 
-    def avancer(self, vitesse_calculee = None):
+    # --------------------------------------------------
+    # ECARTEMENT D'URGENCE
+    # --------------------------------------------------
 
-        vitesse = vitesse_calculee if vitesse_calculee is not None else self.__vitesse
+    def commencer_ecartement_urgence(self):
+        self.__ecartement_urgence = True
+
+    def terminer_ecartement_urgence(self):
+        self.__ecartement_urgence = False
+
+    def est_en_ecartement_urgence(self):
+        return self.__ecartement_urgence
+
+    def est_ecarte_urgence(self):
+        return self.__ecartement_urgence or self.__decalage_lateral != 0
+
+    def mettre_a_jour_ecartement(self):
+        """
+        Déplace progressivement le véhicule vers la droite
+        ou le ramène au centre de sa voie.
+        """
+
+        if self.__ecartement_urgence:
+            if self.__direction == "droite":
+                cible = self.__decalage_max
+
+            elif self.__direction == "gauche":
+                cible = -self.__decalage_max
+
+            elif self.__direction == "bas":
+                cible = -self.__decalage_max
+
+            elif self.__direction == "haut":
+                cible = self.__decalage_max
+
+            else:
+                cible = 0
+
+        else:
+            cible = 0
+
+        if self.__decalage_lateral < cible:
+            self.__decalage_lateral += self.__vitesse_decalage
+            self.__decalage_lateral = min(self.__decalage_lateral, cible)
+
+        elif self.__decalage_lateral > cible:
+            self.__decalage_lateral -= self.__vitesse_decalage
+            self.__decalage_lateral = max(self.__decalage_lateral, cible)
+
+        if self.__direction in ("droite", "gauche"):
+            self.__y = self.__position_laterale_reference + self.__decalage_lateral
+
+        elif self.__direction in ("bas", "haut"):
+            self.__x = self.__position_laterale_reference + self.__decalage_lateral
+
+    # --------------------------------------------------
+    # DEPLACEMENT
+    # --------------------------------------------------
+
+    def avancer(self, vitesse_calculee=None):
+        if vitesse_calculee is None:
+            vitesse = self.__vitesse
+        else:
+            vitesse = vitesse_calculee
 
         if self.__direction == "droite":
             self.__x += vitesse

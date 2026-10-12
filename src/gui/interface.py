@@ -1,5 +1,8 @@
+from PyQt6.QtWidgets import (QWidget,QPushButton)
+from PyQt6.QtGui import QPainter, QPen, QColor
 from PyQt6.QtWidgets import QWidget
 from PyQt6.QtCore import QTimer, Qt
+from src.gui.fenetre_urgence import FenetreUrgence
 from PyQt6.QtGui import QPainter, QPen, QColor, QFont
 
 
@@ -13,6 +16,9 @@ class Interface(QWidget):
         self.setWindowTitle("SAE3.02 - Simulation de trafic")
         self.showMaximized()
 
+        self.__panneau_urgence = FenetreUrgence(self.simulation,self)
+        self.__panneau_urgence.show()
+        self.__fenetre_urgence = None
         self.timer = QTimer()
         self.timer.timeout.connect(self.mettre_a_jour)
         self.timer.start(30)
@@ -27,6 +33,12 @@ class Interface(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
+
+        painter.fillRect(
+            self.rect(),
+            QColor(70, 120, 60)
+        )
+
         painter.setPen(Qt.PenStyle.NoPen)
 
         # Routes
@@ -187,5 +199,12 @@ class Interface(QWidget):
                     int(largeur),
                     int(hauteur)
                 )
+
+    def resizeEvent(self, event):
+        largeur_panneau = (self.__panneau_urgence.width())
+
+        self.__panneau_urgence.setGeometry(self.width() - largeur_panneau,0,largeur_panneau,self.height())
+
+        super().resizeEvent(event)
 
         painter.setPen(Qt.PenStyle.NoPen)
