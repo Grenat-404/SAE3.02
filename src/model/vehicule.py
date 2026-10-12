@@ -99,15 +99,13 @@ class Vehicule:
     def set_y(self, valeur):
         self.__y = valeur
 
-    def set_direction(self, nouvelle_direction):
-        self.__direction = nouvelle_direction
-
     def set_destination(self, destination):
         self.__destination = destination
 
-    # --------------------------------------------------
-    # ECARTEMENT D'URGENCE
-    # --------------------------------------------------
+    def set_direction(self, nouvelle_direction):
+        if nouvelle_direction != self.__direction:
+            self.__decalage_lateral = 0
+        self.__direction = nouvelle_direction
 
     def commencer_ecartement_urgence(self):
         self.__ecartement_urgence = True
@@ -122,11 +120,7 @@ class Vehicule:
         return self.__ecartement_urgence or self.__decalage_lateral != 0
 
     def mettre_a_jour_ecartement(self):
-        """
-        Déplace progressivement le véhicule vers la droite
-        ou le ramène au centre de sa voie.
-        """
-
+        ancien = self.__decalage_lateral
         if self.__ecartement_urgence:
             if self.__direction == "droite":
                 cible = self.__decalage_max
@@ -154,11 +148,11 @@ class Vehicule:
             self.__decalage_lateral -= self.__vitesse_decalage
             self.__decalage_lateral = max(self.__decalage_lateral, cible)
 
+        delta = self.__decalage_lateral - ancien
         if self.__direction in ("droite", "gauche"):
-            self.__y = self.__position_laterale_reference + self.__decalage_lateral
-
+            self.__y += delta
         elif self.__direction in ("bas", "haut"):
-            self.__x = self.__position_laterale_reference + self.__decalage_lateral
+            self.__x += delta
 
     # --------------------------------------------------
     # DEPLACEMENT

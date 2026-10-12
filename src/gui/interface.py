@@ -1,10 +1,7 @@
-from PyQt6.QtWidgets import (QWidget,QPushButton)
-from PyQt6.QtGui import QPainter, QPen, QColor
 from PyQt6.QtWidgets import QWidget
+from PyQt6.QtGui import QPainter, QPen, QColor, QFont
 from PyQt6.QtCore import QTimer, Qt
 from src.gui.fenetre_urgence import FenetreUrgence
-from PyQt6.QtGui import QPainter, QPen, QColor, QFont
-
 
 
 class Interface(QWidget):
@@ -14,11 +11,11 @@ class Interface(QWidget):
         self.simulation = simulation
 
         self.setWindowTitle("SAE3.02 - Simulation de trafic")
+
+        self.__panneau_urgence = FenetreUrgence(self.simulation, self)
+        self.__panneau_urgence.show()
         self.showMaximized()
 
-        self.__panneau_urgence = FenetreUrgence(self.simulation,self)
-        self.__panneau_urgence.show()
-        self.__fenetre_urgence = None
         self.timer = QTimer()
         self.timer.timeout.connect(self.mettre_a_jour)
         self.timer.start(30)
@@ -129,54 +126,56 @@ class Interface(QWidget):
 
             painter.setBrush(Qt.GlobalColor.green if feu.get_etat() == "vert" else Qt.GlobalColor.darkGreen)
             painter.drawEllipse(pos_vert[0], pos_vert[1], 11, 11)
-            # Parking
-            parking = self.simulation.get_parking()
-            painter.setBrush(Qt.GlobalColor.darkGray)
-            for voie in parking.get_voies():
-                painter.drawRect(int(voie.get_x()), int(voie.get_y()), int(voie.get_largeur()), int(voie.get_hauteur()))
 
-            # FlatCap : le trait s'arrête exactement à ses extrémités, il ne dépasse pas
-            pen_parking = QPen(Qt.GlobalColor.white, 2)
-            pen_parking.setCapStyle(Qt.PenCapStyle.FlatCap)
-            painter.setPen(pen_parking)
+        # Parking
+        parking = self.simulation.get_parking()
+        painter.setBrush(Qt.GlobalColor.darkGray)
+        for voie in parking.get_voies():
+            painter.drawRect(int(voie.get_x()), int(voie.get_y()), int(voie.get_largeur()), int(voie.get_hauteur()))
 
-            for place in parking.get_places():
-                x1 = int(place.get_x())
-                x2 = x1 + int(place.get_largeur())
-                y1 = int(place.get_y())
-                y2 = y1 + int(place.get_hauteur())
-                painter.drawLine(x1, y1, x1, y2)
-                painter.drawLine(x2, y1, x2, y2)
+        # FlatCap : le trait s'arrête exactement à ses extrémités, il ne dépasse pas
+        pen_parking = QPen(Qt.GlobalColor.white, 2)
+        pen_parking.setCapStyle(Qt.PenCapStyle.FlatCap)
+        painter.setPen(pen_parking)
 
-            # Flèches d'entrée (vers le haut) et de sortie (vers le bas)
-            xe, ye = parking.get_entree()
-            xs, ys = parking.get_sortie()
-            painter.drawLine(xe, ye - 10, xe, ye - 35)
-            painter.drawLine(xe, ye - 35, xe - 6, ye - 28)
-            painter.drawLine(xe, ye - 35, xe + 6, ye - 28)
-            painter.drawLine(xs, ys - 35, xs, ys - 10)
-            painter.drawLine(xs, ys - 10, xs - 6, ys - 17)
-            painter.drawLine(xs, ys - 10, xs + 6, ys - 17)
+        for place in parking.get_places():
+            x1 = int(place.get_x())
+            x2 = x1 + int(place.get_largeur())
+            y1 = int(place.get_y())
+            y2 = y1 + int(place.get_hauteur())
+            painter.drawLine(x1, y1, x1, y2)
+            painter.drawLine(x2, y1, x2, y2)
 
-            # Bande d'arrêt de la sortie (même épaisseur que les autres lignes d'arrêt)
-            x1, x2, y_arret = parking.get_ligne_arret_sortie()
-            pen_arret = QPen(Qt.GlobalColor.white, 3)
-            pen_arret.setCapStyle(Qt.PenCapStyle.FlatCap)
-            painter.setPen(pen_arret)
-            painter.drawLine(x1, y_arret, x2, y_arret)
+        # Flèches d'entrée (vers le haut) et de sortie (vers le bas)
+        xe, ye = parking.get_entree()
+        xs, ys = parking.get_sortie()
+        painter.drawLine(xe, ye - 10, xe, ye - 35)
+        painter.drawLine(xe, ye - 35, xe - 6, ye - 28)
+        painter.drawLine(xe, ye - 35, xe + 6, ye - 28)
+        painter.drawLine(xs, ys - 35, xs, ys - 10)
+        painter.drawLine(xs, ys - 10, xs - 6, ys - 17)
+        painter.drawLine(xs, ys - 10, xs + 6, ys - 17)
 
-            # Compteur de places
-            painter.setPen(QPen(Qt.GlobalColor.white))
-            painter.setFont(QFont("Arial", 11))
-            painter.drawText(
-                int(parking.get_x()),
-                max(15, int(parking.get_y()) - 8),
-                f"Places libres : {parking.get_nb_libres()} / {parking.get_nb_places()}"
-            )
+        # Bande d'arrêt de la sortie (même épaisseur que les autres lignes d'arrêt)
+        x1, x2, y_arret = parking.get_ligne_arret_sortie()
+        pen_arret = QPen(Qt.GlobalColor.white, 3)
+        pen_arret.setCapStyle(Qt.PenCapStyle.FlatCap)
+        painter.setPen(pen_arret)
+        painter.drawLine(x1, y_arret, x2, y_arret)
 
-            painter.setBrush(Qt.GlobalColor.darkGray)
+        # Compteur de places
+        painter.setPen(QPen(Qt.GlobalColor.white))
+        painter.setFont(QFont("Arial", 11))
+        painter.drawText(
+            int(parking.get_x()),
+            max(15, int(parking.get_y()) - 8),
+            f"Places libres : {parking.get_nb_libres()} / {parking.get_nb_places()}"
+        )
 
-            painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(Qt.GlobalColor.darkGray)
+
+        painter.setPen(Qt.PenStyle.NoPen)
+
 
         for vehicule in self.simulation.get_vehicules():
             couleur = getattr(Qt.GlobalColor, vehicule.get_couleur())
@@ -185,26 +184,14 @@ class Interface(QWidget):
             largeur = vehicule.get_largeur()
             hauteur = vehicule.get_hauteur()
 
-            if vehicule.get_direction() == "haut" or vehicule.get_direction() == "bas":
-                painter.drawRect(
-                    int(vehicule.get_x()),
-                    int(vehicule.get_y()),
-                    int(largeur),
-                    int(hauteur)
-                )
-            else:
-                painter.drawRect(
-                    int(vehicule.get_x()),
-                    int(vehicule.get_y()),
-                    int(largeur),
-                    int(hauteur)
-                )
+            painter.drawRect(
+                int(vehicule.get_x()),
+                int(vehicule.get_y()),
+                int(largeur),
+                int(hauteur)
+            )
 
     def resizeEvent(self, event):
-        largeur_panneau = (self.__panneau_urgence.width())
-
-        self.__panneau_urgence.setGeometry(self.width() - largeur_panneau,0,largeur_panneau,self.height())
-
+        largeur_panneau = self.__panneau_urgence.width()
+        self.__panneau_urgence.setGeometry(self.width() - largeur_panneau, 0, largeur_panneau, self.height())
         super().resizeEvent(event)
-
-        painter.setPen(Qt.PenStyle.NoPen)
