@@ -28,10 +28,6 @@ class Vehicule:
         else:
             self.__position_laterale_reference = x
 
-    # --------------------------------------------------
-    # BLOCAGE
-    # --------------------------------------------------
-
     def incrementer_blocage(self):
         self.__ticks_bloque += 1
     def reset_blocage(self):
@@ -153,10 +149,6 @@ class Vehicule:
             self.__y += delta
         elif self.__direction in ("bas", "haut"):
             self.__x += delta
-
-    # --------------------------------------------------
-    # DEPLACEMENT
-    # --------------------------------------------------
 
     def avancer(self, vitesse_calculee=None):
         if vitesse_calculee is None:

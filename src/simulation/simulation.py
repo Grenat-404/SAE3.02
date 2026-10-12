@@ -559,25 +559,25 @@ class Simulation:
                 self.__feu_droite.set_etat("orange")
                 self.__feu_gauche.set_etat("orange")
                 self.__cycle_state = "horizontal_orange"
-                self.__time_remaining = 100
+                self.__time_remaining = 50
 
             elif self.__cycle_state == "horizontal_orange":
                 self.__feu_droite.set_etat("rouge")
                 self.__feu_gauche.set_etat("rouge")
                 self.__cycle_state = "tout_rouge_1"
-                self.__time_remaining = 100
+                self.__time_remaining = 50
 
             elif self.__cycle_state == "tout_rouge_1":
                 self.__feu_bas.set_etat("vert")
                 self.__feu_haut.set_etat("vert")
                 self.__cycle_state = "vertical_vert"
-                self.__time_remaining = 200
+                self.__time_remaining = 100
 
             elif self.__cycle_state == "vertical_vert":
                 self.__feu_bas.set_etat("orange")
                 self.__feu_haut.set_etat("orange")
                 self.__cycle_state = "vertical_orange"
-                self.__time_remaining = 100
+                self.__time_remaining = 50
 
             elif self.__cycle_state == "vertical_orange":
                 self.__feu_bas.set_etat("rouge")
@@ -589,7 +589,7 @@ class Simulation:
                 self.__feu_droite.set_etat("vert")
                 self.__feu_gauche.set_etat("vert")
                 self.__cycle_state = "horizontal_vert"
-                self.__time_remaining = 100
+                self.__time_remaining = 50
 
     def __feu_bloque_direction(self, direction):
         if direction == "droite":

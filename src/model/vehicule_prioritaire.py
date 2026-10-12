@@ -1,8 +1,6 @@
 from src.model.vehicule import Vehicule
 
 class VehiculePrioritaire(Vehicule):
-    """Représente un véhicule prioritaire."""
-
     def __init__(self,x,y,vitesse,direction,type_service,niveau_priorite,type_urgence,urgence_id):
         super().__init__(x,y,vitesse,direction)
 
@@ -24,10 +22,6 @@ class VehiculePrioritaire(Vehicule):
         return self.__urgence_id
 
     def get_couleur(self):
-        """
-        Retourne une couleur différente selon le service.
-        """
-
         if self.__type_service == "ambulance":
             return "white"
 

@@ -1,19 +1,9 @@
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QComboBox,
-    QSpinBox,
-    QPushButton,
-    QListWidget,
-    QFrame
-)
+from PyQt6.QtWidgets import QWidget,QVBoxLayout,QHBoxLayout,QLabel,QComboBox,QSpinBox,QPushButton,QListWidget,QFrame
+
 
 
 class FenetreUrgence(QWidget):
-    """Panneau permettant de préparer une urgence."""
 
     def __init__(self, simulation, parent=None):
         super().__init__(parent)
@@ -100,10 +90,6 @@ class FenetreUrgence(QWidget):
         """)
 
         self.__creer_interface()
-
-    # --------------------------------------------------
-    # CREATION DE L'INTERFACE
-    # --------------------------------------------------
 
     def __creer_interface(self):
         layout_principal = QVBoxLayout(self)
@@ -473,10 +459,6 @@ class FenetreUrgence(QWidget):
             self.__label_message
         )
 
-    # --------------------------------------------------
-    # REDUIRE / OUVRIR LE PANNEAU
-    # --------------------------------------------------
-
     def __basculer_panneau(self):
         if self.__panneau_reduit:
             self.__contenu.show()
@@ -525,10 +507,6 @@ class FenetreUrgence(QWidget):
         self.updateGeometry()
         self.update()
 
-    # --------------------------------------------------
-    # AJOUTER UN VEHICULE
-    # --------------------------------------------------
-
     def __ajouter_vehicule(self):
         service = self.__combo_service.currentData()
         nom_service = self.__combo_service.currentText()
@@ -554,10 +532,6 @@ class FenetreUrgence(QWidget):
             "Véhicule ajouté."
         )
 
-    # --------------------------------------------------
-    # RETIRER UN VEHICULE
-    # --------------------------------------------------
-
     def __retirer_vehicule(self):
         ligne = (
             self.__liste_vehicules.currentRow()
@@ -581,10 +555,6 @@ class FenetreUrgence(QWidget):
         self.__label_message.setText(
             "Véhicule retiré."
         )
-
-    # --------------------------------------------------
-    # DECLENCHER UNE URGENCE
-    # --------------------------------------------------
 
     def __declencher_urgence(self):
         if len(
