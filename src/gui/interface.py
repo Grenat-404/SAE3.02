@@ -19,14 +19,132 @@ class Interface(QWidget):
         self.timer = QTimer()
         self.timer.timeout.connect(self.mettre_a_jour)
         self.timer.start(30)
+        self.__compteur_clignotant = 0
 
     def mettre_a_jour(self):
         self.simulation.avancer()
+        self.__compteur_clignotant = (self.__compteur_clignotant + 1) % 20
         self.update()
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_Escape:
             self.close()
+
+    def __dessiner_vehicule(self, painter, vehicule):
+        x = int(vehicule.get_x())
+        y = int(vehicule.get_y())
+        largeur = int(vehicule.get_largeur())
+        hauteur = int(vehicule.get_hauteur())
+        direction = vehicule.get_direction()
+
+        couleur = getattr(Qt.GlobalColor, vehicule.get_couleur())
+
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(couleur)
+        painter.drawRect(x, y, largeur, hauteur)
+
+        couleur_pare_brise = QColor(150, 200, 220)
+        couleur_phare = QColor(210, 110, 0)
+        couleur_clignotant = QColor(255, 170, 0)
+
+        clignotant = vehicule.get_clignotant()
+        clignotant_allume = self.__compteur_clignotant < 10
+
+        phare_gauche = couleur_phare
+        phare_droite = couleur_phare
+
+        if clignotant_allume:
+            if clignotant == "gauche":
+                phare_gauche = couleur_clignotant
+            elif clignotant == "droite":
+                phare_droite = couleur_clignotant
+
+        largeur_phare = 3
+        hauteur_phare = 4
+
+        painter.setBrush(couleur_pare_brise)
+
+        if direction == "droite":
+            painter.drawRect(x + largeur - 11, y + 3, 8, hauteur - 6)
+
+            painter.setBrush(phare_gauche)
+            painter.drawRect(x + largeur - largeur_phare, y, largeur_phare, hauteur_phare)
+
+            painter.setBrush(phare_droite)
+            painter.drawRect(x + largeur - largeur_phare, y + hauteur - hauteur_phare, largeur_phare, hauteur_phare)
+
+        elif direction == "gauche":
+            painter.drawRect(x + 3, y + 3, 8, hauteur - 6)
+
+            painter.setBrush(phare_droite)
+            painter.drawRect(x, y, largeur_phare, hauteur_phare)
+
+            painter.setBrush(phare_gauche)
+            painter.drawRect(x, y + hauteur - hauteur_phare, largeur_phare, hauteur_phare)
+
+        elif direction == "bas":
+            painter.drawRect(x + 3, y + hauteur - 11, largeur - 6, 8)
+
+            painter.setBrush(phare_droite)
+            painter.drawRect(x, y + hauteur - largeur_phare, hauteur_phare, largeur_phare)
+
+            painter.setBrush(phare_gauche)
+            painter.drawRect(x + largeur - hauteur_phare, y + hauteur - largeur_phare, hauteur_phare, largeur_phare)
+
+        elif direction == "haut":
+            painter.drawRect(x + 3, y + 3, largeur - 6, 8)
+
+            painter.setBrush(phare_gauche)
+            painter.drawRect(x, y, hauteur_phare, largeur_phare)
+
+            painter.setBrush(phare_droite)
+            painter.drawRect(x + largeur - hauteur_phare, y, hauteur_phare, largeur_phare)
+
+        painter.setPen(Qt.PenStyle.NoPen)
+
+    def __dessiner_char(self, painter, vehicule):
+        largeur = int(vehicule.get_largeur())
+        hauteur = int(vehicule.get_hauteur())
+        x = int(vehicule.get_x())
+        y = int(vehicule.get_y())
+        direction = vehicule.get_direction()
+
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(45, 45, 45))
+
+        if direction in ("droite", "gauche"):
+            painter.drawRect(x, y, largeur, 7)
+            painter.drawRect(x, y + hauteur - 7, largeur, 7)
+        else:
+            painter.drawRect(x, y, 7, hauteur)
+            painter.drawRect(x + largeur - 7, y, 7, hauteur)
+
+        painter.setBrush(QColor(65, 85, 45))
+
+        if direction in ("droite", "gauche"):
+            painter.drawRect(x + 4, y + 7, largeur - 8, hauteur - 14)
+        else:
+            painter.drawRect(x + 7, y + 4, largeur - 14, hauteur - 8)
+
+        centre_x = x + largeur // 2
+        centre_y = y + hauteur // 2
+        taille_tourelle = 16
+
+        painter.setBrush(QColor(90, 105, 55))
+        painter.drawEllipse(centre_x - taille_tourelle // 2, centre_y - taille_tourelle // 2, taille_tourelle, taille_tourelle)
+
+        painter.setPen(QPen(QColor(90, 105, 55), 4))
+
+        if direction == "droite":
+            painter.drawLine(centre_x, centre_y, x + largeur + 10, centre_y)
+        elif direction == "gauche":
+            painter.drawLine(centre_x, centre_y, x - 10, centre_y)
+        elif direction == "bas":
+            painter.drawLine(centre_x, centre_y, centre_x, y + hauteur + 10)
+        elif direction == "haut":
+            painter.drawLine(centre_x, centre_y, centre_x, y - 10)
+
+        painter.setPen(Qt.PenStyle.NoPen)
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -178,18 +296,12 @@ class Interface(QWidget):
 
 
         for vehicule in self.simulation.get_vehicules():
-            couleur = getattr(Qt.GlobalColor, vehicule.get_couleur())
-            painter.setBrush(couleur)
+            est_char = hasattr(vehicule, "get_type_service") and vehicule.get_type_service() == "char"
 
-            largeur = vehicule.get_largeur()
-            hauteur = vehicule.get_hauteur()
-
-            painter.drawRect(
-                int(vehicule.get_x()),
-                int(vehicule.get_y()),
-                int(largeur),
-                int(hauteur)
-            )
+            if est_char:
+                self.__dessiner_char(painter, vehicule)
+            else:
+                self.__dessiner_vehicule(painter, vehicule)
 
     def resizeEvent(self, event):
         largeur_panneau = self.__panneau_urgence.width()

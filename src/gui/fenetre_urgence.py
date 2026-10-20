@@ -318,6 +318,11 @@ class FenetreUrgence(QWidget):
             "police"
         )
 
+        self.__combo_service.addItem(
+            "Char d'assaut",
+            "char"
+        )
+
         layout_vehicule.addWidget(
             self.__combo_service
         )
@@ -354,6 +359,15 @@ class FenetreUrgence(QWidget):
         layout_vehicule.addWidget(
             self.__combo_provenance
         )
+
+        # Direction souhaitée par le véhicule prioritaire
+        layout_vehicule.addWidget(QLabel("Direction voulue :"))
+
+        self.__combo_destination = QComboBox()
+        self.__combo_destination.addItem("Tout droit", "tout_droit")
+        self.__combo_destination.addItem("Tourner à gauche", "gauche")
+        self.__combo_destination.addItem("Tourner à droite", "droite")
+        layout_vehicule.addWidget(self.__combo_destination)
 
         # Bouton ajouter
         bouton_ajouter = QPushButton(
@@ -510,27 +524,26 @@ class FenetreUrgence(QWidget):
     def __ajouter_vehicule(self):
         service = self.__combo_service.currentData()
         nom_service = self.__combo_service.currentText()
-
         direction = self.__combo_provenance.currentData()
         provenance = self.__combo_provenance.currentText()
+        choix_destination = self.__combo_destination.currentData()
 
-        configuration = {
-            "service": service,
-            "direction": direction,
-            "provenance": provenance
+        destinations = {
+            "droite": {"tout_droit": None, "gauche": "haut", "droite": "bas"},
+            "gauche": {"tout_droit": None, "gauche": "bas", "droite": "haut"},
+            "bas": {"tout_droit": None, "gauche": "droite", "droite": "gauche"},
+            "haut": {"tout_droit": None, "gauche": "gauche", "droite": "droite"}
         }
 
-        self.__vehicules_en_attente.append(
-            configuration
-        )
+        destination = destinations[direction][choix_destination]
 
+        configuration = {"service": service, "direction": direction, "destination": destination,
+                         "provenance": provenance}
+
+        self.__vehicules_en_attente.append(configuration)
         self.__liste_vehicules.addItem(
-            f"{nom_service} - vient de {provenance}"
-        )
-
-        self.__label_message.setText(
-            "Véhicule ajouté."
-        )
+            f"{nom_service} - vient de {provenance} - {self.__combo_destination.currentText()}")
+        self.__label_message.setText("Véhicule ajouté.")
 
     def __retirer_vehicule(self):
         ligne = (
