@@ -397,6 +397,10 @@ class Simulation:
             if distance < 0 or distance > self.__distance_detection_priorite:
                 continue
 
+            if self.__etat_priorite == "passage" and self.__meme_groupe_prioritaire(vehicule):
+                self.__vehicules_prioritaires_connus.add(vehicule)
+                continue
+
             self.__ordre_arrivee_priorite += 1
 
             demande = {
@@ -419,9 +423,21 @@ class Simulation:
 
         self.__demandes_prioritaires.sort(key=lambda demande: (-demande["priorite"], demande["ordre"]))
         self.__demande_prioritaire_active = self.__demandes_prioritaires.pop(0)
+
         vehicule = self.__demande_prioritaire_active["vehicule"]
+        urgence_id = vehicule.get_urgence_id()
+        direction = vehicule.get_direction_initiale()
+
+        self.__demandes_prioritaires = [
+            demande for demande in self.__demandes_prioritaires
+            if not (
+                    demande["vehicule"].get_urgence_id() == urgence_id
+                    and demande["vehicule"].get_direction_initiale() == direction
+            )
+        ]
+
         self.__etat_priorite = "passage"
-        self.__appliquer_feu_prioritaire(vehicule.get_direction_initiale())
+        self.__appliquer_feu_prioritaire(direction)
 
     def __reevaluer_priorite_active(self):
         if self.__demande_prioritaire_active is None:
@@ -461,7 +477,7 @@ class Simulation:
         if self.__etat_priorite == "passage":
             self.__appliquer_feu_prioritaire(vehicule.get_direction_initiale())
 
-            if self.__vehicule_prioritaire_a_passe(vehicule):
+            if self.__groupe_prioritaire_a_passe():
                 self.__mettre_tous_feux_rouges()
                 self.__etat_priorite = "retour"
                 self.__compteur_priorite = self.__duree_retour_priorite
@@ -505,11 +521,20 @@ class Simulation:
         elif direction == "haut":
             self.__feu_haut.set_etat("vert")
 
-    def __est_prioritaire_actif(self, vehicule):
+    def __meme_groupe_prioritaire(self, vehicule):
         if self.__demande_prioritaire_active is None:
             return False
+        if not isinstance(vehicule, VehiculePrioritaire):
+            return False
 
-        return self.__demande_prioritaire_active["vehicule"] is vehicule
+        actif = self.__demande_prioritaire_active["vehicule"]
+
+        return (vehicule.get_urgence_id() == actif.get_urgence_id() and vehicule.get_direction_initiale() == actif.get_direction_initiale())
+
+    def __est_prioritaire_actif(self, vehicule):
+        if self.__etat_priorite != "passage":
+            return False
+        return self.__meme_groupe_prioritaire(vehicule)
 
     def __direction_prioritaire_active(self):
         if self.__demande_prioritaire_active is None or self.__etat_priorite != "passage":
@@ -534,6 +559,14 @@ class Simulation:
             return vehicule.get_y() + vehicule.get_hauteur() < iy - marge
 
         return False
+
+    def __groupe_prioritaire_a_passe(self):
+        for vehicule in self.__vehicules:
+            if self.__meme_groupe_prioritaire(vehicule):
+                if not self.__vehicule_prioritaire_a_passe(vehicule):
+                    return False
+
+        return True
 
     def __restaurer_cycle_normal(self, direction):
         if direction in ("droite", "gauche"):
@@ -570,37 +603,44 @@ class Simulation:
         if self.__demande_prioritaire_active is None or self.__etat_priorite != "passage":
             return False
 
-        prioritaire = self.__demande_prioritaire_active["vehicule"]
         direction = vehicule.get_direction()
 
-        if prioritaire.get_direction() != direction:
+        if direction != self.__demande_prioritaire_active["vehicule"].get_direction_initiale():
             return False
 
-        distance_intersection = self.__distance_avant_intersection(vehicule)
-
-        if distance_intersection < 0:
+        if self.__distance_avant_intersection(vehicule) < 0:
             return False
 
-        if direction in ("droite", "gauche"):
-            distance_laterale = abs(prioritaire.get_y() - vehicule.get_y())
-        else:
-            distance_laterale = abs(prioritaire.get_x() - vehicule.get_x())
+        for prioritaire in self.__vehicules:
+            if not self.__meme_groupe_prioritaire(prioritaire):
+                continue
 
-        if distance_laterale > 60:
-            return False
+            if prioritaire.get_direction() != direction:
+                continue
 
-        if direction == "droite":
-            distance = vehicule.get_x() - prioritaire.get_x()
-        elif direction == "gauche":
-            distance = prioritaire.get_x() - vehicule.get_x()
-        elif direction == "bas":
-            distance = vehicule.get_y() - prioritaire.get_y()
-        elif direction == "haut":
-            distance = prioritaire.get_y() - vehicule.get_y()
-        else:
-            return False
+            if direction in ("droite", "gauche"):
+                distance_laterale = abs(prioritaire.get_y() - vehicule.get_y())
+            else:
+                distance_laterale = abs(prioritaire.get_x() - vehicule.get_x())
 
-        return -self.__distance_liberation_ecartement <= distance <= self.__distance_detection_ecartement
+            if distance_laterale > 60:
+                continue
+
+            if direction == "droite":
+                distance = vehicule.get_x() - prioritaire.get_x()
+            elif direction == "gauche":
+                distance = prioritaire.get_x() - vehicule.get_x()
+            elif direction == "bas":
+                distance = vehicule.get_y() - prioritaire.get_y()
+            elif direction == "haut":
+                distance = prioritaire.get_y() - vehicule.get_y()
+            else:
+                continue
+
+            if -self.__distance_liberation_ecartement <= distance <= self.__distance_detection_ecartement:
+                return True
+
+        return False
 
     def __vitesse_deplacement(self, vehicule):
         if isinstance(vehicule, VehiculePrioritaire):
