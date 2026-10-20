@@ -1,25 +1,17 @@
 class Feu:
-    """Représente un feu de circulation."""
-
-    ROUGE = "rouge"
-    ORANGE = "orange"
-    VERT = "vert"
-
-    def __init__(
-        self,
-        identifiant,
-        direction,
-        etat=ROUGE
-    ):
-        self.__identifiant = identifiant
-        self.__direction = direction
+    def __init__(self, x, y, etat="rouge", orientation="vertical", inverse = False):
+        self.__x = x
+        self.__y = y
         self.__etat = etat
+        self.__orientation = orientation
+        self.__inverse = inverse
 
-    def get_identifiant(self):
-        return self.__identifiant
 
-    def get_direction(self):
-        return self.__direction
+    def get_x(self):
+        return self.__x
+
+    def get_y(self):
+        return self.__y
 
     def get_etat(self):
         return self.__etat
@@ -27,11 +19,8 @@ class Feu:
     def set_etat(self, etat):
         self.__etat = etat
 
-    def passer_au_rouge(self):
-        self.__etat = Feu.ROUGE
+    def get_orientation(self):
+        return self.__orientation
 
-    def passer_a_orange(self):
-        self.__etat = Feu.ORANGE
-
-    def passer_au_vert(self):
-        self.__etat = Feu.VERT
+    def get_inverse(self):
+        return self.__inverse
