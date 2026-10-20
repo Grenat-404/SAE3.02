@@ -14,6 +14,8 @@ class Vehicule:
         self.__place = None
         self.__timer = 0
         self.__veut_se_garer = False
+        self.__clignotant = None
+        self.__temps_clignotant = 0
 
         # Gestion de l'écartement pour les urgences
         self.__ecartement_urgence = False
@@ -44,6 +46,18 @@ class Vehicule:
         return self.__vitesse
     def get_direction(self):
         return self.__direction
+    def get_clignotant(self):
+        return self.__clignotant
+
+    def activer_clignotant(self, cote, duree=25):
+        self.__clignotant = cote
+        self.__temps_clignotant = duree
+
+    def mettre_a_jour_clignotant(self):
+        if self.__temps_clignotant > 0:
+            self.__temps_clignotant -= 1
+        else:
+            self.__clignotant = None
 
     def get_dimensions(self):
         if self.__direction == "droite" or self.__direction == "gauche":

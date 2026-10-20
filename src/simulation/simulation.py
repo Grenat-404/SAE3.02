@@ -277,6 +277,11 @@ class Simulation:
                 return
 
         if direction != vehicule.get_direction():
+            cote = self.__cote_clignotant(vehicule.get_direction(), direction)
+
+            if cote is not None:
+                vehicule.activer_clignotant(cote)
+
             vehicule.set_direction(direction)
             self.__placer_centre(vehicule, centre_x, centre_y)
 
@@ -318,8 +323,12 @@ class Simulation:
             vehicule.set_etat("gare")
             vehicule.set_timer(random.randint(150, 600))
 
+
         elif etat == "sortant":
             centre_x, centre_y = self.__centre(vehicule)
+            cote = self.__cote_clignotant(vehicule.get_direction(), "gauche")
+            if cote is not None:
+                vehicule.activer_clignotant(cote)
             vehicule.set_direction("gauche")
             self.__placer_centre(vehicule, centre_x, self.__y_route_gauche)
             vehicule.set_place(None)
@@ -755,6 +764,16 @@ class Simulation:
 
         return False
 
+    def __cote_clignotant(self, direction, destination):
+        directions = {
+            "droite": {"haut": "gauche", "bas": "droite"},
+            "gauche": {"bas": "gauche", "haut": "droite"},
+            "bas": {"droite": "gauche", "gauche": "droite"},
+            "haut": {"gauche": "gauche", "droite": "droite"}
+        }
+
+        return directions.get(direction, {}).get(destination)
+
     def avancer(self):
         self.__detecter_demandes_prioritaires()
 
@@ -767,12 +786,27 @@ class Simulation:
 
         for vehicule in self.__vehicules:
             doit_s_arreter = False
+            vehicule.mettre_a_jour_clignotant()
 
             if vehicule.get_etat() != "route":
                 self.__gerer_parking(vehicule)
                 continue
 
             vitesse = self.__vitesse_deplacement(vehicule)
+            if vehicule.get_destination() is not None:
+                distance = self.__distance_avant_intersection(vehicule)
+
+                if 0 <= distance <= 120:
+                    cote = self.__cote_clignotant(vehicule.get_direction(), vehicule.get_destination())
+
+                    if cote is not None:
+                        vehicule.activer_clignotant(cote)
+            if vehicule.get_veut_se_garer() and vehicule.get_direction() == "gauche":
+                x_entree = self.__parking.get_entree()[0]
+                centre_x, centre_y = self.__centre(vehicule)
+
+                if 0 <= centre_x - x_entree <= 100:
+                    vehicule.activer_clignotant("droite")
 
             if self.__gerer_arret_feu(vehicule, vitesse):
                 doit_s_arreter = True
