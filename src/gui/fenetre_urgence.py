@@ -17,10 +17,6 @@ class FenetreUrgence(QWidget):
 
         self.setFixedWidth(self.__largeur_ouverte)
 
-        # --------------------------------------------------
-        # STYLE DU PANNEAU
-        # --------------------------------------------------
-
         self.setObjectName("panneauUrgence")
 
         self.setStyleSheet("""
@@ -107,10 +103,6 @@ class FenetreUrgence(QWidget):
 
         layout_principal.setSpacing(8)
 
-        # ==================================================
-        # BOUTON REDUIRE
-        # ==================================================
-
         self.__bouton_reduire = QPushButton("▶")
 
         self.__bouton_reduire.setObjectName(
@@ -155,10 +147,6 @@ class FenetreUrgence(QWidget):
             layout_bouton
         )
 
-        # ==================================================
-        # CONTENU
-        # ==================================================
-
         self.__contenu = QWidget()
 
         layout = QVBoxLayout(
@@ -179,9 +167,6 @@ class FenetreUrgence(QWidget):
             self.__contenu
         )
 
-        # ==================================================
-        # BLOC 1 - INFORMATIONS DE L'URGENCE
-        # ==================================================
 
         bloc_urgence = QFrame()
         bloc_urgence.setObjectName("bloc")
@@ -250,56 +235,27 @@ class FenetreUrgence(QWidget):
             5
         )
 
-        self.__spin_priorite.setValue(
-            3
-        )
+        self.__spin_priorite.setValue(3)
 
-        layout_urgence.addWidget(
-            self.__spin_priorite
-        )
+        layout_urgence.addWidget(self.__spin_priorite)
 
-        layout.addWidget(
-            bloc_urgence
-        )
-
-        # ==================================================
-        # BLOC 2 - AJOUT D'UN VEHICULE
-        # ==================================================
+        layout.addWidget(bloc_urgence)
 
         bloc_vehicule = QFrame()
         bloc_vehicule.setObjectName("bloc")
 
-        layout_vehicule = QVBoxLayout(
-            bloc_vehicule
-        )
+        layout_vehicule = QVBoxLayout(bloc_vehicule)
 
-        layout_vehicule.setContentsMargins(
-            10,
-            10,
-            10,
-            10
-        )
+        layout_vehicule.setContentsMargins(10,10,10,10)
 
         layout_vehicule.setSpacing(6)
 
-        titre_vehicule = QLabel(
-            "Ajouter un véhicule"
-        )
-
-        titre_vehicule.setObjectName(
-            "titreBloc"
-        )
-
-        layout_vehicule.addWidget(
-            titre_vehicule
-        )
+        titre_vehicule = QLabel("Ajouter un véhicule")
+        titre_vehicule.setObjectName("titreBloc")
+        layout_vehicule.addWidget(titre_vehicule)
 
         # Type de véhicule
-        layout_vehicule.addWidget(
-            QLabel(
-                "Type de véhicule :"
-            )
-        )
+        layout_vehicule.addWidget(QLabel("Type de véhicule :"))
 
         self.__combo_service = QComboBox()
 
@@ -318,16 +274,15 @@ class FenetreUrgence(QWidget):
             "police"
         )
 
-        layout_vehicule.addWidget(
-            self.__combo_service
+        self.__combo_service.addItem(
+            "Char d'assaut",
+            "char"
         )
 
+        layout_vehicule.addWidget(self.__combo_service)
+
         # Provenance
-        layout_vehicule.addWidget(
-            QLabel(
-                "Le véhicule vient de :"
-            )
-        )
+        layout_vehicule.addWidget(QLabel("Le véhicule vient de :"))
 
         self.__combo_provenance = QComboBox()
 
@@ -351,9 +306,16 @@ class FenetreUrgence(QWidget):
             "droite"
         )
 
-        layout_vehicule.addWidget(
-            self.__combo_provenance
-        )
+        layout_vehicule.addWidget(self.__combo_provenance)
+
+        layout_vehicule.addWidget(QLabel("Direction voulue :"))
+
+        self.__combo_destination = QComboBox()
+        self.__combo_destination.addItem("Tout droit", "tout_droit")
+        self.__combo_destination.addItem("Tourner à gauche", "gauche")
+        self.__combo_destination.addItem("Tourner à droite", "droite")
+
+        layout_vehicule.addWidget(self.__combo_destination)
 
         # Bouton ajouter
         bouton_ajouter = QPushButton(
@@ -371,10 +333,6 @@ class FenetreUrgence(QWidget):
         layout.addWidget(
             bloc_vehicule
         )
-
-        # ==================================================
-        # BLOC 3 - VEHICULES DE L'URGENCE
-        # ==================================================
 
         bloc_liste = QFrame()
         bloc_liste.setObjectName("bloc")
@@ -445,10 +403,6 @@ class FenetreUrgence(QWidget):
             bloc_liste
         )
 
-        # ==================================================
-        # MESSAGE
-        # ==================================================
-
         self.__label_message = QLabel("")
 
         self.__label_message.setWordWrap(
@@ -510,27 +464,26 @@ class FenetreUrgence(QWidget):
     def __ajouter_vehicule(self):
         service = self.__combo_service.currentData()
         nom_service = self.__combo_service.currentText()
-
         direction = self.__combo_provenance.currentData()
         provenance = self.__combo_provenance.currentText()
+        choix_destination = self.__combo_destination.currentData()
 
-        configuration = {
-            "service": service,
-            "direction": direction,
-            "provenance": provenance
+        destinations = {
+            "droite": {"tout_droit": None, "gauche": "haut", "droite": "bas"},
+            "gauche": {"tout_droit": None, "gauche": "bas", "droite": "haut"},
+            "bas": {"tout_droit": None, "gauche": "droite", "droite": "gauche"},
+            "haut": {"tout_droit": None, "gauche": "gauche", "droite": "droite"}
         }
 
-        self.__vehicules_en_attente.append(
-            configuration
-        )
+        destination = destinations[direction][choix_destination]
 
+        configuration = {"service": service, "direction": direction, "destination": destination,
+                         "provenance": provenance}
+
+        self.__vehicules_en_attente.append(configuration)
         self.__liste_vehicules.addItem(
-            f"{nom_service} - vient de {provenance}"
-        )
-
-        self.__label_message.setText(
-            "Véhicule ajouté."
-        )
+            f"{nom_service} - vient de {provenance} - {self.__combo_destination.currentText()}")
+        self.__label_message.setText("Véhicule ajouté.")
 
     def __retirer_vehicule(self):
         ligne = (
