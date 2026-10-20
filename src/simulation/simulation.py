@@ -3,7 +3,6 @@ from src.model.intersection import Intersection
 from src.model.feu import Feu
 from src.model.vehicule import Vehicule
 from src.model.vehicule_prioritaire import VehiculePrioritaire
-
 import random
 from src.model.parking import Parking
 
@@ -17,13 +16,18 @@ class Simulation:
         self.__demande_prioritaire_active = None
         self.__vehicules_prioritaires_connus = set()
         self.__ordre_arrivee_priorite = 0
-        # None / passage / retour
-        self.__etat_priorite = None
+        self.__etat_priorite = None # None / passage / retour
         self.__compteur_priorite = 0
         self.__distance_detection_priorite = 400
         self.__distance_detection_ecartement = 300
         self.__distance_liberation_ecartement = 80
         self.__duree_retour_priorite = 15
+
+        self.__duree_stop_sortie = 25
+        self.__vitesse_sortie = 2.5
+        self.__marge_sortie = 20
+        self.__attente_stop_sortie = {}
+        self.__sorties_engagees = set()
 
         self.__cycle_state = "horizontal_vert"
         self.__time_remaining = 100
@@ -35,9 +39,13 @@ class Simulation:
 
         route_horizontale = Route(0, centre_y - largeur_route // 2, largeur_ecran, largeur_route)
         route_verticale = Route(centre_x - largeur_route // 2, 0, largeur_route, hauteur_ecran)
+        route_verticale_rond_point = Route(1400, 200, 100, 300)
+        route_horizontal_rond_point = Route(1000, 100, 300, 100)
 
         self.__routes.append(route_horizontale)
         self.__routes.append(route_verticale)
+        self.__routes.append(route_verticale_rond_point)
+        self.__routes.append(route_horizontal_rond_point)
 
         self.__intersection = Intersection(centre_x - largeur_route // 2,centre_y - largeur_route // 2,largeur_route,largeur_route)
 
@@ -80,7 +88,6 @@ class Simulation:
         self.__vehicules.append(voiture3)
         self.__vehicules.append(voiture4)
 
-
     def get_routes(self):
         return self.__routes
     def get_feux(self):
@@ -102,7 +109,7 @@ class Simulation:
             x, y = spawn_pos["x"], spawn_pos["y"]
 
             if direction in ("droite", "gauche"):
-                y += random.randint(-5, 5)
+                y += random.randint(-3, 3)
                 destinations = [None, None, "bas", "haut"]
                 destination = random.choice(destinations)
             else:
@@ -164,17 +171,61 @@ class Simulation:
                 return True
         return False
 
+    def est_manoeuvre_libre(self, vehicule, direction_cible):
+        cx, cy = self.__centre(vehicule)
+        largeur_virage = vehicule.get_largeur() * 1.2
+        hauteur_virage = vehicule.get_hauteur() * 1.2
+
+        if direction_cible == "haut":
+            target_x, target_y = cx, cy - hauteur_virage / 2
+        elif direction_cible == "bas":
+            target_x, target_y = cx, cy + hauteur_virage / 2
+        elif direction_cible == "droite":
+            target_x, target_y = cx + largeur_virage / 2, cy
+        else:  # gauche
+            target_x, target_y = cx - largeur_virage / 2, cy
+
+        min_x = min(cx - largeur_virage / 2, target_x - largeur_virage / 2)
+        max_x = max(cx + largeur_virage / 2, target_x + largeur_virage / 2)
+        min_y = min(cy - hauteur_virage / 2, target_y - hauteur_virage / 2)
+        max_y = max(cy + hauteur_virage / 2, target_y + hauteur_virage / 2)
+
+        for autre in self.__vehicules:
+            if autre is vehicule or autre.get_etat() != "route":
+                continue
+            ax, ay = self.__centre(autre)
+            collision_x = max(min_x, ax - autre.get_largeur() / 2) < min(max_x, ax + autre.get_largeur() / 2)
+            collision_y = max(min_y, ay - autre.get_hauteur() / 2) < min(max_y, ay + autre.get_hauteur() / 2)
+
+            if collision_x and collision_y:
+                return False
+        return True
+
     def __route_libre_sortie(self, vehicule):
         xs = self.__parking.get_sortie()[0]
+        cy_sortant = self.__centre(vehicule)[1]
+        ticks_traversee = abs(self.__y_route_gauche - cy_sortant) / self.__vitesse_sortie
+        marge_derriere = vehicule.get_largeur() + self.__marge_sortie
+
         for autre in self.__vehicules:
             if autre is vehicule or autre.get_etat() != "route":
                 continue
             if autre.get_direction() != "gauche":
                 continue
             cx, cy = self.__centre(autre)
-            if 0 < cx - xs < 90 and abs(cy - self.__y_route_gauche) < 30:
+            if abs(cy - self.__y_route_gauche) > 30:
+                continue
+            seuil = autre.get_vitesse() * ticks_traversee + autre.get_largeur() + self.__marge_sortie
+            if -marge_derriere < cx - xs < seuil:
                 return False
         return True
+
+    def __autorisation_sortie(self, vehicule):
+        attente = self.__attente_stop_sortie.get(vehicule, self.__duree_stop_sortie)
+        if attente > 0:
+            self.__attente_stop_sortie[vehicule] = attente - 1
+            return False
+        return self.__route_libre_sortie(vehicule)
 
     def __entrer_parking(self, vehicule):
         xe = self.__parking.get_entree()[0]
@@ -218,8 +269,10 @@ class Simulation:
 
         # Dernière étape de la sortie
         if vehicule.get_etat() == "sortant" and len(trajet) == 1:
-            if not self.__route_libre_sortie(vehicule):
-                return
+            if vehicule not in self.__sorties_engagees:
+                if not self.__autorisation_sortie(vehicule):
+                    return
+                self.__sorties_engagees.add(vehicule)
 
         if direction != vehicule.get_direction():
             vehicule.set_direction(direction)
@@ -228,7 +281,7 @@ class Simulation:
         if self.__bloque_devant(vehicule):
             return
 
-        pas = min(vehicule.get_vitesse(), 2.5, distance)
+        pas = min(vehicule.get_vitesse(), self.__vitesse_sortie, distance)
         if direction == "droite":
             cx += pas
         elif direction == "gauche":
@@ -264,6 +317,8 @@ class Simulation:
             self.__placer_centre(vehicule, cx, self.__y_route_gauche)
             vehicule.set_place(None)
             vehicule.set_etat("route")
+            self.__sorties_engagees.discard(vehicule)
+            self.__attente_stop_sortie.pop(vehicule, None)
 
     def creer_urgence(self, type_urgence, niveau_priorite, vehicules):
         urgence_id = self.__prochain_id_urgence
@@ -665,7 +720,7 @@ class Simulation:
         return False
 
     def voie_libre(self, vehicule):
-        seuil = 60
+        seuil = 50
 
         for autre in self.__vehicules:
             if autre is vehicule:
@@ -733,7 +788,7 @@ class Simulation:
 
             vitesse = self.__vitesse_deplacement(vehicule)
 
-            if self.__gerer_arret_feu(vehicule,vitesse):
+            if self.__gerer_arret_feu(vehicule, vitesse):
                 doit_s_arreter = True
 
             # GAUCHE -> DROITE
@@ -742,12 +797,12 @@ class Simulation:
                 # Virage vers le haut
                 if vehicule.get_destination() == "haut":
                     centre_voie_haut = (
-                        self.__intersection.get_x()
-                        + self.__intersection.get_largeur() * 3 // 4
+                            self.__intersection.get_x()
+                            + self.__intersection.get_largeur() * 3 // 4
                     )
 
                     if vehicule.get_x() >= centre_voie_haut:
-                        if self.voie_libre(vehicule):
+                        if self.est_manoeuvre_libre(vehicule, "haut"):
                             vehicule.set_x(centre_voie_haut)
                             vehicule.set_direction("haut")
                             vehicule.set_destination(None)
@@ -757,12 +812,12 @@ class Simulation:
                 # Virage vers le bas
                 if vehicule.get_destination() == "bas":
                     centre_voie_bas = (
-                        self.__intersection.get_x()
-                        + self.__intersection.get_largeur() // 4
+                            self.__intersection.get_x()
+                            + self.__intersection.get_largeur() // 4
                     )
 
                     if vehicule.get_x() >= centre_voie_bas:
-                        if self.voie_libre(vehicule):
+                        if self.est_manoeuvre_libre(vehicule, "bas"):
                             vehicule.set_x(centre_voie_bas)
                             vehicule.set_direction("bas")
                             vehicule.set_destination(None)
@@ -781,7 +836,7 @@ class Simulation:
                 if vehicule.get_destination() == "haut":
                     centre_voie_haut = self.__intersection.get_x() + self.__intersection.get_largeur() * 3 // 4
                     if vehicule.get_x() <= centre_voie_haut:
-                        if self.voie_libre(vehicule):
+                        if self.est_manoeuvre_libre(vehicule, "haut"):
                             vehicule.set_x(centre_voie_haut)
                             vehicule.set_direction("haut")
                             vehicule.set_destination(None)
@@ -791,7 +846,7 @@ class Simulation:
                 if vehicule.get_destination() == "bas":
                     centre_voie_bas = self.__intersection.get_x() + self.__intersection.get_largeur() // 4
                     if vehicule.get_x() <= centre_voie_bas:
-                        if self.voie_libre(vehicule):
+                        if self.est_manoeuvre_libre(vehicule, "bas"):
                             vehicule.set_x(centre_voie_bas)
                             vehicule.set_direction("bas")
                             vehicule.set_destination(None)
@@ -810,7 +865,7 @@ class Simulation:
                 if vehicule.get_destination() == "droite":
                     centre_voie_droite = self.__intersection.get_y() + self.__intersection.get_hauteur() * 3 // 4
                     if vehicule.get_y() >= centre_voie_droite:
-                        if self.voie_libre(vehicule):
+                        if self.est_manoeuvre_libre(vehicule, "droite"):
                             vehicule.set_y(centre_voie_droite)
                             vehicule.set_direction("droite")
                             vehicule.set_destination(None)
@@ -820,7 +875,7 @@ class Simulation:
                 if vehicule.get_destination() == "gauche":
                     centre_voie_gauche = self.__intersection.get_y() + self.__intersection.get_hauteur() // 4
                     if vehicule.get_y() >= centre_voie_gauche:
-                        if self.voie_libre(vehicule):
+                        if self.est_manoeuvre_libre(vehicule, "gauche"):
                             vehicule.set_y(centre_voie_gauche)
                             vehicule.set_direction("gauche")
                             vehicule.set_destination(None)
@@ -839,7 +894,7 @@ class Simulation:
                 if vehicule.get_destination() == "droite":
                     centre_voie_droite = self.__intersection.get_y() + self.__intersection.get_hauteur() * 3 // 4
                     if vehicule.get_y() <= centre_voie_droite:
-                        if self.voie_libre(vehicule):
+                        if self.est_manoeuvre_libre(vehicule, "droite"):
                             vehicule.set_y(centre_voie_droite)
                             vehicule.set_direction("droite")
                             vehicule.set_destination(None)
@@ -849,7 +904,7 @@ class Simulation:
                 if vehicule.get_destination() == "gauche":
                     centre_voie_gauche = self.__intersection.get_y() + self.__intersection.get_hauteur() // 4
                     if vehicule.get_y() <= centre_voie_gauche:
-                        if self.voie_libre(vehicule):
+                        if self.est_manoeuvre_libre(vehicule, "gauche"):
                             vehicule.set_y(centre_voie_gauche)
                             vehicule.set_direction("gauche")
                             vehicule.set_destination(None)
@@ -864,13 +919,13 @@ class Simulation:
                 dy = autre.get_y() - vehicule.get_y()
 
                 devant = False
-                if vehicule.get_direction() == "droite" and dx > 0 and abs(dy) < 20:
+                if vehicule.get_direction() == "droite" and dx > 0 and abs(dy) < 22:
                     devant = True
-                elif vehicule.get_direction() == "gauche" and dx < 0 and abs(dy) < 20:
+                elif vehicule.get_direction() == "gauche" and dx < 0 and abs(dy) < 22:
                     devant = True
-                elif vehicule.get_direction() == "bas" and dy > 0 and abs(dx) < 20:
+                elif vehicule.get_direction() == "bas" and dy > 0 and abs(dx) < 22:
                     devant = True
-                elif vehicule.get_direction() == "haut" and dy < 0 and abs(dx) < 20:
+                elif vehicule.get_direction() == "haut" and dy < 0 and abs(dx) < 22:
                     devant = True
 
                 if devant:
