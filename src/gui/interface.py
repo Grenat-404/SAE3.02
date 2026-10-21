@@ -1,7 +1,11 @@
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtWidgets import QWidget, QApplication, QMessageBox
 from PyQt6.QtGui import QPainter, QPen, QColor, QFont
 from PyQt6.QtCore import QTimer, Qt
 from src.gui.fenetre_urgence import FenetreUrgence
+from src.gui.selecteur_osm import SelecteurOSM
+from src.simulation.simulation import Simulation
+from src.osm.simulation_osm import SimulationOSM
+from src.gui.vue_osm import dessiner_osm
 
 
 class Interface(QWidget):
@@ -12,8 +16,24 @@ class Interface(QWidget):
 
         self.setWindowTitle("SAE3.02 - Simulation de trafic")
 
-        self.__panneau_urgence = FenetreUrgence(self.simulation, self)
+        self.__panneau_urgence = FenetreUrgence(
+            self.simulation,
+            self
+        )
         self.__panneau_urgence.show()
+
+        # Sélection du carrefour
+        self.__carrefour_selectionne = None
+
+        self.__selecteur_osm = SelecteurOSM(self)
+
+        self.__selecteur_osm.carrefour_charge.connect(
+            self.__charger_nouvelle_simulation
+        )
+
+        self.__selecteur_osm.move(12, 12)
+        self.__selecteur_osm.show()
+
         self.showMaximized()
 
         self.timer = QTimer()
@@ -27,6 +47,64 @@ class Interface(QWidget):
         if self.__compteur_clignotant >= 20:
             self.__compteur_clignotant = 0
         self.update()
+
+    def __charger_nouvelle_simulation(self, carrefour):
+        self.timer.stop()
+
+        try:
+            if carrefour is None:
+                # Mode prédéfini : moteur original inchangé
+                ecran = QApplication.primaryScreen().geometry()
+
+                nouvelle_simulation = Simulation(
+                    ecran.width(),
+                    ecran.height()
+                )
+            else:
+                # Mode OpenStreetMap : nouveau moteur
+                nouvelle_simulation = SimulationOSM(
+                    carrefour["chemin"],
+                    carrefour["id"],
+                    self.width(),
+                    self.height()
+                )
+
+            # Reconnecter le panneau d'urgence
+            ancien_panneau = self.__panneau_urgence
+
+            self.simulation = nouvelle_simulation
+
+            self.__panneau_urgence = FenetreUrgence(
+                self.simulation,
+                self
+            )
+
+            largeur = self.__panneau_urgence.width()
+
+            self.__panneau_urgence.setGeometry(
+                self.width() - largeur,
+                0,
+                largeur,
+                self.height()
+            )
+
+            self.__panneau_urgence.show()
+
+            ancien_panneau.close()
+            ancien_panneau.deleteLater()
+
+            self.__carrefour_selectionne = carrefour
+
+        except Exception as erreur:
+            QMessageBox.warning(
+                self,
+                "Chargement du carrefour",
+                str(erreur)
+            )
+
+        finally:
+            self.timer.start(30)
+            self.update()
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_Escape:
@@ -148,6 +226,16 @@ class Interface(QWidget):
         painter.setPen(Qt.PenStyle.NoPen)
 
     def paintEvent(self, event):
+        if isinstance(self.simulation, SimulationOSM):
+            painter = QPainter(self)
+
+            dessiner_osm(
+                painter,
+                self.simulation,
+                self.__compteur_clignotant
+            )
+
+            return
         painter = QPainter(self)
 
         painter.fillRect(self.rect(), QColor(70, 120, 60))
@@ -276,6 +364,30 @@ class Interface(QWidget):
         )
 
         painter.setPen(Qt.PenStyle.NoPen)
+
+        # Affichage du nom du carrefour
+        painter.setPen(QPen(Qt.GlobalColor.white))
+        painter.setFont(QFont("Arial", 12))
+
+        if self.__carrefour_selectionne is None:
+            titre = "Carrefour prédéfini"
+        else:
+            c = self.__carrefour_selectionne
+
+            titre = (
+                f"OSM schématique : "
+                f"{c['carte']} — {c['nom']}"
+            )
+
+        painter.drawText(15, 100, titre)
+
+        # Attribution OpenStreetMap
+        if self.__carrefour_selectionne is not None:
+            painter.drawText(
+                15,
+                self.height() - 15,
+                "Données © contributeurs OpenStreetMap"
+            )
 
         for vehicule in self.simulation.get_vehicules():
             est_char = hasattr(vehicule, "get_type_service") and vehicule.get_type_service() == "char"

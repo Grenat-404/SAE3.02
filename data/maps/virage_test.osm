@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="sae302-test">
+  <node id="1" lat="48.000000" lon="7.000000"/>
+  <node id="2" lat="48.001000" lon="7.001300"/>
+  <node id="3" lat="48.002000" lon="7.001700"/>
+  <node id="4" lat="47.999000" lon="6.998700"/>
+  <node id="5" lat="47.998000" lon="6.998200"/>
+  <node id="6" lat="47.999700" lon="7.001500"/>
+  <node id="7" lat="47.999400" lon="7.002500"/>
+  <way id="100"><nd ref="3"/><nd ref="2"/><nd ref="1"/><nd ref="4"/><nd ref="5"/>
+   <tag k="highway" v="residential"/><tag k="name" v="Rue diagonale"/></way>
+  <way id="101"><nd ref="1"/><nd ref="6"/><nd ref="7"/>
+   <tag k="highway" v="residential"/><tag k="name" v="Rue courbe"/></way>
+</osm>
