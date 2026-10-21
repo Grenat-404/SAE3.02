@@ -22,6 +22,7 @@ class Simulation:
         self.__distance_detection_ecartement = 300
         self.__distance_liberation_ecartement = 80
         self.__duree_retour_priorite = 15
+        self.__vehicules_ecartes_ce_tick = set()
 
         self.__duree_stop_sortie = 25
         self.__vitesse_sortie = 2.5
@@ -138,10 +139,33 @@ class Simulation:
             else:  # haut
                 self.__spawn_pos["haut"]["y"] = y
 
+    def __secours_en_approche_hors_ecran(self, vehicule):
+        # Les renforts d'une même provenance patientent en dehors de l'écran.
+        # Ne pas les confondre avec les véhicules ayant terminé leur trajet.
+        if not isinstance(vehicule, VehiculePrioritaire):
+            return False
+
+        direction = vehicule.get_direction_initiale()
+        if vehicule.get_direction() != direction:
+            return False
+
+        x, y = vehicule.get_x(), vehicule.get_y()
+        if direction == "droite":
+            return x < 0 and 0 <= y <= self.__hauteur_ecran
+        if direction == "gauche":
+            return x > self.__largeur_ecran and 0 <= y <= self.__hauteur_ecran
+        if direction == "bas":
+            return y < 0 and 0 <= x <= self.__largeur_ecran
+        if direction == "haut":
+            return y > self.__hauteur_ecran and 0 <= x <= self.__largeur_ecran
+        return False
+
     def despawn_vehicles(self):
         vehicules_a_garder = []
         for vehicule in self.__vehicules:
-            if 0 <= vehicule.get_x() <= self.__largeur_ecran and 0 <= vehicule.get_y() <= self.__hauteur_ecran:
+            dans_ecran = (0 <= vehicule.get_x() <= self.__largeur_ecran
+                          and 0 <= vehicule.get_y() <= self.__hauteur_ecran)
+            if dans_ecran or self.__secours_en_approche_hors_ecran(vehicule):
                 vehicules_a_garder.append(vehicule)
         self.__vehicules = vehicules_a_garder
 
@@ -355,8 +379,29 @@ class Simulation:
         elif direction == "haut":
             y += espace
 
-#        vitesse = 1.5 if type_service == "char" else 4
-        vehicule = VehiculePrioritaire(x, y, 4, direction, destination, type_service, niveau_priorite, type_urgence, urgence_id)
+        # Éviter les superpositions si plusieurs urgences sont déclenchées
+        # successivement avec la même provenance.
+        while any(
+            isinstance(autre, VehiculePrioritaire)
+            and autre.get_direction_initiale() == direction
+            and autre.get_direction() == direction
+            and abs(autre.get_x() - x) < 65
+            and abs(autre.get_y() - y) < 65
+            for autre in self.__vehicules
+        ):
+            if direction == "droite":
+                x -= 65
+            elif direction == "gauche":
+                x += 65
+            elif direction == "bas":
+                y -= 65
+            else:
+                y += 65
+
+        vehicule = VehiculePrioritaire(
+            x, y, 4, direction, destination,
+            type_service, niveau_priorite, type_urgence, urgence_id
+        )
         self.__vehicules.append(vehicule)
 
     def __distance_avant_intersection(self, vehicule):
@@ -592,16 +637,25 @@ class Simulation:
         self.__time_remaining = 100
 
     def __mettre_a_jour_ecartement_urgence(self):
+        self.__vehicules_ecartes_ce_tick.clear()
+
         for vehicule in self.__vehicules:
             if isinstance(vehicule, VehiculePrioritaire):
                 continue
             if vehicule.get_etat() != "route":
                 continue
+
+            # Bloquer l'avancement même à l'instant où le décalage revient à zéro.
+            etait_ecarte = vehicule.est_ecarte_urgence()
+
             if self.__urgence_active_derriere(vehicule):
                 vehicule.commencer_ecartement_urgence()
             else:
                 vehicule.terminer_ecartement_urgence()
             vehicule.mettre_a_jour_ecartement()
+
+            if etait_ecarte or vehicule.est_ecarte_urgence():
+                self.__vehicules_ecartes_ce_tick.add(vehicule)
 
     def __urgence_active_derriere(self, vehicule):
         if self.__demande_prioritaire_active is None or self.__etat_priorite != "passage":
@@ -649,7 +703,7 @@ class Simulation:
     def __vitesse_deplacement(self, vehicule):
         if isinstance(vehicule, VehiculePrioritaire):
             return vehicule.get_vitesse()
-        if vehicule.est_ecarte_urgence():
+        if vehicule in self.__vehicules_ecartes_ce_tick:
             return 0
         return vehicule.get_vitesse()
 
@@ -814,6 +868,35 @@ class Simulation:
                             return False
 
         return True
+
+    def __voie_reservee_pendant_ecartement(self, vehicule, autre):
+        # Garder la place longitudinale du véhicule qui se rabat :
+        # une voiture derrière lui ne doit pas avancer dans sa place,
+        # même si elle est à 28 pixels sur le côté.
+        if isinstance(vehicule, VehiculePrioritaire) or isinstance(autre, VehiculePrioritaire):
+            return False
+        if vehicule.get_direction() != autre.get_direction():
+            return False
+        if (vehicule not in self.__vehicules_ecartes_ce_tick
+                and autre not in self.__vehicules_ecartes_ce_tick):
+            return False
+
+        direction = vehicule.get_direction()
+        if direction in ("droite", "gauche"):
+            lateral = abs(autre.get_y() - vehicule.get_y())
+            distance = autre.get_x() - vehicule.get_x()
+            taille = (vehicule.get_largeur() + autre.get_largeur()) / 2
+        else:
+            lateral = abs(autre.get_x() - vehicule.get_x())
+            distance = autre.get_y() - vehicule.get_y()
+            taille = (vehicule.get_hauteur() + autre.get_hauteur()) / 2
+
+        if direction in ("gauche", "haut"):
+            distance = -distance
+
+        # Les autres voies restent indépendantes ; seul le couloir
+        # de circulation des deux voitures doit être réservé.
+        return lateral < 60 and 0 <= distance <= taille + 10 + vehicule.get_vitesse()
 
     def __cote_clignotant(self, direction, destination):
         directions = {
@@ -987,6 +1070,10 @@ class Simulation:
 
             for autre in self.__vehicules:
                 if autre is vehicule:
+                    continue
+
+                if self.__voie_reservee_pendant_ecartement(vehicule, autre):
+                    doit_s_arreter = True
                     continue
 
                 # Le couloir dégagé par les véhicules écartés reste libre pour les secours.
