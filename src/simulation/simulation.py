@@ -141,15 +141,12 @@ class Simulation:
                 voiture.set_veut_se_garer(True)
                 voiture.set_destination(None)
             self.__ajouter_vehicule(voiture)
-            # Mettre à jour la position de spawn pour le prochain véhicule
             if direction in ("droite", "gauche"):
                 self.__spawn_pos[direction]["x"] = x
             else:
                 self.__spawn_pos[direction]["y"] = y
 
     def __secours_en_approche_hors_ecran(self, vehicule):
-        # Les renforts d'une même provenance patientent en dehors de l'écran.
-        # Ne pas les confondre avec les véhicules ayant terminé leur trajet.
         if not isinstance(vehicule, VehiculePrioritaire):
             return False
         direction = vehicule.get_direction_initiale()
@@ -213,7 +210,7 @@ class Simulation:
             target_x, target_y = cx, cy + hauteur_virage / 2
         elif direction_cible == "droite":
             target_x, target_y = cx + largeur_virage / 2, cy
-        else:  # gauche
+        else:
             target_x, target_y = cx - largeur_virage / 2, cy
         min_x = min(cx - largeur_virage / 2, target_x - largeur_virage / 2)
         max_x = max(cx + largeur_virage / 2, target_x + largeur_virage / 2)
@@ -354,8 +351,6 @@ class Simulation:
         sens_x, sens_y = {"droite": (-1, 0), "gauche": (1, 0), "bas": (0, -1), "haut": (0, 1)}[direction]
         x = self.__spawn_pos[direction]["x"] + sens_x * 65 * decalage
         y = self.__spawn_pos[direction]["y"] + sens_y * 65 * decalage
-        # Éviter les superpositions si plusieurs urgences sont déclenchées
-        # successivement avec la même provenance.
         while any(
             isinstance(autre, VehiculePrioritaire)
             and autre.get_direction_initiale() == direction
@@ -547,7 +542,6 @@ class Simulation:
                 continue
             if vehicule.get_etat() != "route":
                 continue
-            # Bloquer l'avancement même à l'instant où le décalage revient à zéro.
             etait_ecarte = vehicule.est_ecarte_urgence()
             if self.__urgence_active_derriere(vehicule):
                 vehicule.commencer_ecartement_urgence()
@@ -750,14 +744,12 @@ class Simulation:
         return directions.get(direction, {}).get(destination)
 
     def __signaler_clignotants(self, vehicule):
-        # Clignotants pour les changements de direction au carrefour.
         if vehicule.get_destination() is not None:
             distance = self.__distance_avant_intersection(vehicule)
             if 0 <= distance <= 120:
                 cote = self.__cote_clignotant(vehicule.get_direction(), vehicule.get_destination())
                 if cote is not None:
                     vehicule.activer_clignotant(cote)
-        # Signalisation de l'entrée dans le parking.
         if vehicule.get_veut_se_garer() and vehicule.get_direction() == "gauche":
             if 0 <= self.__centre(vehicule)[0] - self.__parking.get_entree()[0] <= 100:
                 vehicule.activer_clignotant("droite")
