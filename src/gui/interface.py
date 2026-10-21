@@ -43,7 +43,6 @@ class Interface(QWidget):
         painter.setBrush(couleur)
         painter.drawRect(x, y, largeur, hauteur)
 
-        couleur_pare_brise = QColor(150, 200, 220)
         couleur_phare = QColor(210, 110, 0)
         couleur_clignotant = QColor(255, 170, 0)
 
@@ -59,10 +58,9 @@ class Interface(QWidget):
             elif clignotant == "droite":
                 phare_droite = couleur_clignotant
 
-        largeur_phare = 3
-        hauteur_phare = 4
+        largeur_phare = 5
+        hauteur_phare = 6
 
-        painter.setBrush(couleur_pare_brise)
 
         if direction == "droite":
             painter.drawRect(x + largeur - 11, y + 3, 8, hauteur - 6)
