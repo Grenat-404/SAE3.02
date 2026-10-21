@@ -3,14 +3,40 @@ from src.model.intersection import Intersection
 from src.model.feu import Feu
 from src.model.vehicule import Vehicule
 from src.model.vehicule_prioritaire import VehiculePrioritaire
-import random
 from src.model.parking import Parking
+import random
+import threading
+import time
+
+PERIODE_TICK = 0.03
+
+class ThreadVehicule(threading.Thread):
+    def __init__(self, simulation, vehicule):
+        super().__init__(daemon=True)
+        self.__simulation = simulation
+        self.__vehicule = vehicule
+        self.__actif = True
+
+    def arreter(self):
+        self.__actif = False
+
+    def run(self):
+        prochain = time.monotonic()
+        while self.__actif:
+            self.__simulation.mettre_a_jour_vehicule(self.__vehicule)
+            prochain += PERIODE_TICK
+            attente = prochain - time.monotonic()
+            if attente > 0:
+                time.sleep(attente)
+            else:
+                prochain = time.monotonic()
 
 class Simulation:
     def __init__(self, largeur_ecran, hauteur_ecran):
+        self.__verrou = threading.RLock()
+        self.__threads = {}
         self.__vehicules = []
         self.__routes = []
-
         self.__prochain_id_urgence = 1
         self.__demandes_prioritaires = []
         self.__demande_prioritaire_active = None
@@ -23,51 +49,35 @@ class Simulation:
         self.__distance_liberation_ecartement = 80
         self.__duree_retour_priorite = 15
         self.__vehicules_ecartes_ce_tick = set()
-
         self.__duree_stop_sortie = 25
         self.__vitesse_sortie = 2.5
         self.__marge_sortie = 20
         self.__attente_stop_sortie = {}
         self.__sorties_engagees = set()
-
         self.__cycle_state = "horizontal_vert"
         self.__time_remaining = 100
-
         largeur_route = 150
-
         centre_x = largeur_ecran // 2
         centre_y = hauteur_ecran // 2
-
-        route_horizontale = Route(0, centre_y - largeur_route // 2, largeur_ecran, largeur_route)
-        route_verticale = Route(centre_x - largeur_route // 2, 0, largeur_route, hauteur_ecran)
-        route_verticale_rond_point = Route(1400, 200, 100, 300)
-        route_horizontal_rond_point = Route(1000, 100, 300, 100)
-
-        self.__routes.append(route_horizontale)
-        self.__routes.append(route_verticale)
-        self.__routes.append(route_verticale_rond_point)
-        self.__routes.append(route_horizontal_rond_point)
-
-        self.__intersection = Intersection(centre_x - largeur_route // 2,centre_y - largeur_route // 2,largeur_route,largeur_route)
-
+        self.__routes.append(Route(0, centre_y - largeur_route // 2, largeur_ecran, largeur_route))
+        self.__routes.append(Route(centre_x - largeur_route // 2, 0, largeur_route, hauteur_ecran))
+        self.__routes.append(Route(1400, 200, 100, 300))
+        self.__routes.append(Route(1000, 100, 300, 100))
+        self.__intersection = Intersection(centre_x - largeur_route // 2, centre_y - largeur_route // 2, largeur_route, largeur_route)
         ix = self.__intersection.get_x()
         iy = self.__intersection.get_y()
         il = self.__intersection.get_largeur()
         ih = self.__intersection.get_hauteur()
-
         trottoir = 20
         hauteur_parking = min(200, iy - trottoir - 10)
         largeur_parking = min(480, ix - 100)
         self.__parking = Parking(60, iy - trottoir - hauteur_parking, largeur_parking, hauteur_parking, trottoir)
-
         # Feux (positionnés relativement à l'intersection, comme avant)
         self.__feu_gauche = Feu(ix + il, iy - 22, "vert", "verticale", False)
         self.__feu_droite = Feu(ix - 58, iy + ih, "vert", "verticale", True)
         self.__feu_haut = Feu(ix + il, iy + ih, "rouge", "horizontale", False)
         self.__feu_bas = Feu(ix - 22, iy - 58, "rouge", "horizontale", True)
-
         self.__feux = [self.__feu_droite, self.__feu_gauche, self.__feu_bas, self.__feu_haut]
-
         self.__spawn_pos = {
             "droite": {"x": 20, "y": iy + ih * 3 // 4},
             "gauche": {"x": largeur_ecran - 20, "y": iy + ih // 4},
@@ -75,26 +85,37 @@ class Simulation:
             "haut": {"x": ix + il * 3 // 4, "y": hauteur_ecran}
         }
         self.__y_route_gauche = iy + ih // 4 + 10
-
         self.__largeur_ecran = largeur_ecran
         self.__hauteur_ecran = hauteur_ecran
+        for direction, destination in (("droite", None), ("gauche", "haut"), ("bas", None), ("haut", None)):
+            pos = self.__spawn_pos[direction]
+            self.__ajouter_vehicule(Vehicule(pos["x"], pos["y"], 4, direction, destination))
 
-        voiture1 = Vehicule(self.__spawn_pos["droite"]["x"], self.__spawn_pos["droite"]["y"], 4, "droite")
-        voiture2 = Vehicule(self.__spawn_pos["gauche"]["x"], self.__spawn_pos["gauche"]["y"], 4, "gauche", "haut")
-        voiture3 = Vehicule(self.__spawn_pos["bas"]["x"], self.__spawn_pos["bas"]["y"], 4, "bas")
-        voiture4 = Vehicule(self.__spawn_pos["haut"]["x"], self.__spawn_pos["haut"]["y"], 4, "haut")
+    def __ajouter_vehicule(self, vehicule):
+        with self.__verrou:
+            self.__vehicules.append(vehicule)
+            thread = ThreadVehicule(self, vehicule)
+            self.__threads[vehicule] = thread
+            thread.start()
 
-        self.__vehicules.append(voiture1)
-        self.__vehicules.append(voiture2)
-        self.__vehicules.append(voiture3)
-        self.__vehicules.append(voiture4)
+    def __arreter_thread(self, vehicule):
+        thread = self.__threads.pop(vehicule, None)
+        if thread is not None:
+            thread.arreter()
+
+    def arreter(self):
+        with self.__verrou:
+            for thread in self.__threads.values():
+                thread.arreter()
+            self.__threads.clear()
 
     def get_routes(self):
         return self.__routes
     def get_feux(self):
         return self.__feux
     def get_vehicules(self):
-        return self.__vehicules
+        with self.__verrou:
+            return list(self.__vehicules)
     def get_intersections(self):
         return self.__intersection
     def get_parking(self):
@@ -102,53 +123,38 @@ class Simulation:
 
     def spawn_vehicles(self):
         if random.randint(1, 30) == 1 and len(self.__vehicules) < 30:
-            directions = ["droite", "gauche", "bas", "haut"]
-            direction = random.choice(directions)
+            direction = random.choice(["droite", "gauche", "bas", "haut"])
             vitesse = 3
-
-            spawn_pos = self.__spawn_pos[direction]
-            x, y = spawn_pos["x"], spawn_pos["y"]
-
+            x, y = self.__spawn_pos[direction]["x"], self.__spawn_pos[direction]["y"]
             if direction in ("droite", "gauche"):
                 y += random.randint(-3, 3)
-                destinations = [None, None, "bas", "haut"]
-                destination = random.choice(destinations)
+                destination = random.choice([None, None, "bas", "haut"])
             else:
                 x += random.randint(-5, 5)
-                destinations = [None, None, "droite", "gauche"]
-                destination = random.choice(destinations)
-
+                destination = random.choice([None, None, "droite", "gauche"])
             for v in self.__vehicules:
                 if v.get_direction() == direction:
                     if abs(v.get_x() - x) < 40 and abs(v.get_y() - y) < 40:
                         return
-
             voiture = Vehicule(x, y, vitesse, direction, destination)
             if direction == "gauche" and random.random() < 0.3:
                 voiture.set_veut_se_garer(True)
                 voiture.set_destination(None)
-            self.__vehicules.append(voiture)
-
+            self.__ajouter_vehicule(voiture)
             # Mettre à jour la position de spawn pour le prochain véhicule
-            if direction == "droite":
-                self.__spawn_pos["droite"]["x"] = x
-            elif direction == "gauche":
-                self.__spawn_pos["gauche"]["x"] = x
-            elif direction == "bas":
-                self.__spawn_pos["bas"]["y"] = y
-            else:  # haut
-                self.__spawn_pos["haut"]["y"] = y
+            if direction in ("droite", "gauche"):
+                self.__spawn_pos[direction]["x"] = x
+            else:
+                self.__spawn_pos[direction]["y"] = y
 
     def __secours_en_approche_hors_ecran(self, vehicule):
         # Les renforts d'une même provenance patientent en dehors de l'écran.
         # Ne pas les confondre avec les véhicules ayant terminé leur trajet.
         if not isinstance(vehicule, VehiculePrioritaire):
             return False
-
         direction = vehicule.get_direction_initiale()
         if vehicule.get_direction() != direction:
             return False
-
         x, y = vehicule.get_x(), vehicule.get_y()
         if direction == "droite":
             return x < 0 and 0 <= y <= self.__hauteur_ecran
@@ -167,6 +173,8 @@ class Simulation:
                           and 0 <= vehicule.get_y() <= self.__hauteur_ecran)
             if dans_ecran or self.__secours_en_approche_hors_ecran(vehicule):
                 vehicules_a_garder.append(vehicule)
+            else:
+                self.__arreter_thread(vehicule)
         self.__vehicules = vehicules_a_garder
 
     def __centre(self, v):
@@ -199,7 +207,6 @@ class Simulation:
         cx, cy = self.__centre(vehicule)
         largeur_virage = vehicule.get_largeur() * 1.2
         hauteur_virage = vehicule.get_hauteur() * 1.2
-
         if direction_cible == "haut":
             target_x, target_y = cx, cy - hauteur_virage / 2
         elif direction_cible == "bas":
@@ -208,19 +215,16 @@ class Simulation:
             target_x, target_y = cx + largeur_virage / 2, cy
         else:  # gauche
             target_x, target_y = cx - largeur_virage / 2, cy
-
         min_x = min(cx - largeur_virage / 2, target_x - largeur_virage / 2)
         max_x = max(cx + largeur_virage / 2, target_x + largeur_virage / 2)
         min_y = min(cy - hauteur_virage / 2, target_y - hauteur_virage / 2)
         max_y = max(cy + hauteur_virage / 2, target_y + hauteur_virage / 2)
-
         for autre in self.__vehicules:
             if autre is vehicule or autre.get_etat() != "route":
                 continue
             ax, ay = self.__centre(autre)
             collision_x = max(min_x, ax - autre.get_largeur() / 2) < min(max_x, ax + autre.get_largeur() / 2)
             collision_y = max(min_y, ay - autre.get_hauteur() / 2) < min(max_y, ay + autre.get_hauteur() / 2)
-
             if collision_x and collision_y:
                 return False
         return True
@@ -230,7 +234,6 @@ class Simulation:
         cy_sortant = self.__centre(vehicule)[1]
         ticks_traversee = abs(self.__y_route_gauche - cy_sortant) / self.__vitesse_sortie
         marge_derriere = vehicule.get_largeur() + self.__marge_sortie
-
         for autre in self.__vehicules:
             if autre is vehicule or autre.get_etat() != "route":
                 continue
@@ -254,18 +257,15 @@ class Simulation:
     def __entrer_parking(self, vehicule):
         xe = self.__parking.get_entree()[0]
         cx, cy = self.__centre(vehicule)
-
         if cx > xe:
             return False
         if cx < xe - 25:
             vehicule.set_veut_se_garer(False)
             return False
-
         place = self.__parking.get_place_libre()
         if place is None:
             vehicule.set_veut_se_garer(False)
             return False
-
         place.set_occupee(True)
         vehicule.set_place(place)
         vehicule.set_direction("haut")
@@ -280,7 +280,6 @@ class Simulation:
         cible_x, cible_y = trajet[0]
         dx = cible_x - cx
         dy = cible_y - cy
-
         if abs(dx) > 0.5:
             direction = "droite" if dx > 0 else "gauche"
             distance = abs(dx)
@@ -290,21 +289,17 @@ class Simulation:
         else:
             trajet.pop(0)
             return
-
         # Dernière étape de la sortie
         if vehicule.get_etat() == "sortant" and len(trajet) == 1:
             if vehicule not in self.__sorties_engagees:
                 if not self.__autorisation_sortie(vehicule):
                     return
                 self.__sorties_engagees.add(vehicule)
-
         if direction != vehicule.get_direction():
             vehicule.set_direction(direction)
             self.__placer_centre(vehicule, cx, cy)
-
         if self.__bloque_devant(vehicule):
             return
-
         pas = min(vehicule.get_vitesse(), self.__vitesse_sortie, distance)
         if direction == "droite":
             cx += pas
@@ -318,7 +313,6 @@ class Simulation:
 
     def __gerer_parking(self, vehicule):
         etat = vehicule.get_etat()
-
         if etat == "gare":
             vehicule.set_timer(vehicule.get_timer() - 1)
             if vehicule.get_timer() <= 0:
@@ -327,11 +321,9 @@ class Simulation:
                 vehicule.set_trajet(self.__parking.get_trajet_sortie(place, self.__y_route_gauche))
                 vehicule.set_etat("sortant")
             return
-
         if vehicule.get_trajet():
             self.__suivre_trajet(vehicule)
             return
-
         if etat == "entrant":
             vehicule.set_etat("gare")
             vehicule.set_timer(random.randint(150, 600))  # 5 à 18 secondes
@@ -345,40 +337,23 @@ class Simulation:
             self.__attente_stop_sortie.pop(vehicule, None)
 
     def creer_urgence(self, type_urgence, niveau_priorite, vehicules):
-        urgence_id = self.__prochain_id_urgence
-        self.__prochain_id_urgence += 1
-        nombre_par_direction = {}
+        with self.__verrou:
+            urgence_id = self.__prochain_id_urgence
+            self.__prochain_id_urgence += 1
+            nombre_par_direction = {}
+            for configuration in vehicules:
+                direction = configuration["direction"]
+                decalage = nombre_par_direction.get(direction, 0)
+                self.__ajouter_vehicule_prioritaire(configuration["service"], direction, configuration["destination"], niveau_priorite, type_urgence, urgence_id, decalage)
+                nombre_par_direction[direction] = decalage + 1
+            return urgence_id
 
-        for configuration in vehicules:
-            direction = configuration["direction"]
-            destination = configuration["destination"]
-            type_service = configuration["service"]
-
-            decalage = nombre_par_direction.get(direction, 0)
-
-            self.__ajouter_vehicule_prioritaire(type_service, direction, destination, niveau_priorite, type_urgence, urgence_id, decalage)
-            nombre_par_direction[direction] = decalage + 1
-
-        return urgence_id
-
-    def __ajouter_vehicule_prioritaire(self, type_service, direction, destination, niveau_priorite, type_urgence,urgence_id, decalage):
+    def __ajouter_vehicule_prioritaire(self, type_service, direction, destination, niveau_priorite, type_urgence, urgence_id, decalage):
         if direction not in self.__spawn_pos:
             return
-
-        spawn = self.__spawn_pos[direction]
-        x = spawn["x"]
-        y = spawn["y"]
-        espace = 65 * decalage
-
-        if direction == "droite":
-            x -= espace
-        elif direction == "gauche":
-            x += espace
-        elif direction == "bas":
-            y -= espace
-        elif direction == "haut":
-            y += espace
-
+        sens_x, sens_y = {"droite": (-1, 0), "gauche": (1, 0), "bas": (0, -1), "haut": (0, 1)}[direction]
+        x = self.__spawn_pos[direction]["x"] + sens_x * 65 * decalage
+        y = self.__spawn_pos[direction]["y"] + sens_y * 65 * decalage
         # Éviter les superpositions si plusieurs urgences sont déclenchées
         # successivement avec la même provenance.
         while any(
@@ -389,39 +364,23 @@ class Simulation:
             and abs(autre.get_y() - y) < 65
             for autre in self.__vehicules
         ):
-            if direction == "droite":
-                x -= 65
-            elif direction == "gauche":
-                x += 65
-            elif direction == "bas":
-                y -= 65
-            else:
-                y += 65
-
-        vehicule = VehiculePrioritaire(
-            x, y, 4, direction, destination,
-            type_service, niveau_priorite, type_urgence, urgence_id
-        )
-        self.__vehicules.append(vehicule)
+            x += sens_x * 65
+            y += sens_y * 65
+        self.__ajouter_vehicule(VehiculePrioritaire(x, y, 4, direction, destination, type_service, niveau_priorite, type_urgence, urgence_id))
 
     def __distance_avant_intersection(self, vehicule):
         ix = self.__intersection.get_x()
         iy = self.__intersection.get_y()
         il = self.__intersection.get_largeur()
         ih = self.__intersection.get_hauteur()
-
         if vehicule.get_direction() == "droite":
-            position_arret = ix - vehicule.get_largeur()
-            return position_arret - vehicule.get_x()
+            return ix - vehicule.get_largeur() - vehicule.get_x()
         elif vehicule.get_direction() == "gauche":
-            position_arret = ix + il
-            return vehicule.get_x() - position_arret
+            return vehicule.get_x() - (ix + il)
         elif vehicule.get_direction() == "bas":
-            position_arret = iy - vehicule.get_hauteur()
-            return position_arret - vehicule.get_y()
+            return iy - vehicule.get_hauteur() - vehicule.get_y()
         elif vehicule.get_direction() == "haut":
-            position_arret = iy + ih
-            return vehicule.get_y() - position_arret
+            return vehicule.get_y() - (iy + ih)
         return -1
 
     def __vehicule_est_avant_intersection(self, vehicule):
@@ -431,46 +390,34 @@ class Simulation:
         for vehicule in self.__vehicules:
             if not isinstance(vehicule, VehiculePrioritaire):
                 continue
-
             if vehicule in self.__vehicules_prioritaires_connus:
                 continue
-
             distance = self.__distance_avant_intersection(vehicule)
-
             if distance < 0 or distance > self.__distance_detection_priorite:
                 continue
-
             if self.__etat_priorite == "passage" and self.__meme_groupe_prioritaire(vehicule):
                 self.__vehicules_prioritaires_connus.add(vehicule)
                 continue
-
             self.__ordre_arrivee_priorite += 1
-
             demande = {
                 "vehicule": vehicule,
                 "priorite": vehicule.get_niveau_priorite(),
                 "ordre": self.__ordre_arrivee_priorite
             }
-
             self.__demandes_prioritaires.append(demande)
             self.__vehicules_prioritaires_connus.add(vehicule)
-
         if self.__demande_prioritaire_active is None and len(self.__demandes_prioritaires) > 0:
             self.__activer_prochaine_priorite()
-
         self.__reevaluer_priorite_active()
 
     def __activer_prochaine_priorite(self):
         if len(self.__demandes_prioritaires) == 0:
             return
-
         self.__demandes_prioritaires.sort(key=lambda demande: (-demande["priorite"], demande["ordre"]))
         self.__demande_prioritaire_active = self.__demandes_prioritaires.pop(0)
-
         vehicule = self.__demande_prioritaire_active["vehicule"]
         urgence_id = vehicule.get_urgence_id()
         direction = vehicule.get_direction_initiale()
-
         self.__demandes_prioritaires = [
             demande for demande in self.__demandes_prioritaires
             if not (
@@ -478,7 +425,6 @@ class Simulation:
                     and demande["vehicule"].get_direction_initiale() == direction
             )
         ]
-
         self.__etat_priorite = "passage"
         self.__appliquer_feu_prioritaire(direction)
 
@@ -490,12 +436,9 @@ class Simulation:
         if self.__etat_priorite != "passage":
             return
         vehicule_actif = self.__demande_prioritaire_active["vehicule"]
-
         if not self.__vehicule_est_avant_intersection(vehicule_actif):
             return
-
-        meilleure_demande = min(self.__demandes_prioritaires,key=lambda demande: (-demande["priorite"],demande["ordre"]))
-
+        meilleure_demande = min(self.__demandes_prioritaires, key=lambda demande: (-demande["priorite"], demande["ordre"]))
         priorite_active = self.__demande_prioritaire_active["priorite"]
         if meilleure_demande["priorite"] <= priorite_active:
             return
@@ -507,71 +450,52 @@ class Simulation:
     def __mettre_a_jour_priorite(self):
         if self.__demande_prioritaire_active is None:
             return
-
         vehicule = self.__demande_prioritaire_active["vehicule"]
-
         if vehicule not in self.__vehicules:
             self.__terminer_priorite()
             return
-
         if self.__etat_priorite == "passage":
             self.__appliquer_feu_prioritaire(vehicule.get_direction_initiale())
-
             if self.__groupe_prioritaire_a_passe():
                 self.__mettre_tous_feux_rouges()
                 self.__etat_priorite = "retour"
                 self.__compteur_priorite = self.__duree_retour_priorite
-
         elif self.__etat_priorite == "retour":
             self.__mettre_tous_feux_rouges()
             self.__compteur_priorite -= 1
-
             if self.__compteur_priorite <= 0:
                 self.__terminer_priorite()
 
     def __terminer_priorite(self):
         if self.__demande_prioritaire_active is None:
             return
-
         direction_terminee = self.__demande_prioritaire_active["vehicule"].get_direction_initiale()
         self.__demande_prioritaire_active = None
         self.__etat_priorite = None
-
         if len(self.__demandes_prioritaires) > 0:
             self.__activer_prochaine_priorite()
             return
-
         self.__restaurer_cycle_normal(direction_terminee)
 
+    def __feu_de(self, direction):
+        return {"droite": self.__feu_droite, "gauche": self.__feu_gauche, "bas": self.__feu_bas, "haut": self.__feu_haut}.get(direction)
+
     def __mettre_tous_feux_rouges(self):
-        self.__feu_droite.set_etat("rouge")
-        self.__feu_gauche.set_etat("rouge")
-        self.__feu_bas.set_etat("rouge")
-        self.__feu_haut.set_etat("rouge")
+        for feu in self.__feux:
+            feu.set_etat("rouge")
 
     def __appliquer_feu_prioritaire(self, direction):
         self.__mettre_tous_feux_rouges()
-
-        if direction == "droite":
-            self.__feu_droite.set_etat("vert")
-
-        elif direction == "gauche":
-            self.__feu_gauche.set_etat("vert")
-
-        elif direction == "bas":
-            self.__feu_bas.set_etat("vert")
-
-        elif direction == "haut":
-            self.__feu_haut.set_etat("vert")
+        feu = self.__feu_de(direction)
+        if feu is not None:
+            feu.set_etat("vert")
 
     def __meme_groupe_prioritaire(self, vehicule):
         if self.__demande_prioritaire_active is None:
             return False
         if not isinstance(vehicule, VehiculePrioritaire):
             return False
-
         actif = self.__demande_prioritaire_active["vehicule"]
-
         return (vehicule.get_urgence_id() == actif.get_urgence_id() and vehicule.get_direction_initiale() == actif.get_direction_initiale())
 
     def __est_prioritaire_actif(self, vehicule):
@@ -582,7 +506,6 @@ class Simulation:
     def __direction_prioritaire_active(self):
         if self.__demande_prioritaire_active is None or self.__etat_priorite != "passage":
             return None
-
         return self.__demande_prioritaire_active["vehicule"].get_direction_initiale()
 
     def __vehicule_prioritaire_a_passe(self, vehicule):
@@ -590,21 +513,15 @@ class Simulation:
         iy = self.__intersection.get_y()
         il = self.__intersection.get_largeur()
         ih = self.__intersection.get_hauteur()
-
         marge = 60
-
         if vehicule.get_direction() == "droite":
             return vehicule.get_x() > ix + il + marge
-
         elif vehicule.get_direction() == "gauche":
             return vehicule.get_x() + vehicule.get_largeur() < ix - marge
-
         elif vehicule.get_direction() == "bas":
             return vehicule.get_y() > iy + ih + marge
-
         elif vehicule.get_direction() == "haut":
             return vehicule.get_y() + vehicule.get_hauteur() < iy - marge
-
         return False
 
     def __groupe_prioritaire_a_passe(self):
@@ -612,78 +529,53 @@ class Simulation:
             if self.__meme_groupe_prioritaire(vehicule):
                 if not self.__vehicule_prioritaire_a_passe(vehicule):
                     return False
-
         return True
 
     def __restaurer_cycle_normal(self, direction):
-        if direction in ("droite", "gauche"):
-            self.__feu_droite.set_etat("vert")
-            self.__feu_gauche.set_etat("vert")
-
-            self.__feu_bas.set_etat("rouge")
-            self.__feu_haut.set_etat("rouge")
-
-            self.__cycle_state = "horizontal_vert"
-
-        else:
-            self.__feu_droite.set_etat("rouge")
-            self.__feu_gauche.set_etat("rouge")
-
-            self.__feu_bas.set_etat("vert")
-            self.__feu_haut.set_etat("vert")
-
-            self.__cycle_state = "vertical_vert"
-
+        horizontal = direction in ("droite", "gauche")
+        for feu in (self.__feu_droite, self.__feu_gauche):
+            feu.set_etat("vert" if horizontal else "rouge")
+        for feu in (self.__feu_bas, self.__feu_haut):
+            feu.set_etat("rouge" if horizontal else "vert")
+        self.__cycle_state = "horizontal_vert" if horizontal else "vertical_vert"
         self.__time_remaining = 100
 
     def __mettre_a_jour_ecartement_urgence(self):
         self.__vehicules_ecartes_ce_tick.clear()
-
         for vehicule in self.__vehicules:
             if isinstance(vehicule, VehiculePrioritaire):
                 continue
             if vehicule.get_etat() != "route":
                 continue
-
             # Bloquer l'avancement même à l'instant où le décalage revient à zéro.
             etait_ecarte = vehicule.est_ecarte_urgence()
-
             if self.__urgence_active_derriere(vehicule):
                 vehicule.commencer_ecartement_urgence()
             else:
                 vehicule.terminer_ecartement_urgence()
             vehicule.mettre_a_jour_ecartement()
-
             if etait_ecarte or vehicule.est_ecarte_urgence():
                 self.__vehicules_ecartes_ce_tick.add(vehicule)
 
     def __urgence_active_derriere(self, vehicule):
         if self.__demande_prioritaire_active is None or self.__etat_priorite != "passage":
             return False
-
         direction = vehicule.get_direction()
-
         if direction != self.__demande_prioritaire_active["vehicule"].get_direction_initiale():
             return False
-
         if self.__distance_avant_intersection(vehicule) < 0:
             return False
-
         for prioritaire in self.__vehicules:
             if not self.__meme_groupe_prioritaire(prioritaire):
                 continue
-
             if prioritaire.get_direction() != direction:
                 continue
-
             if direction in ("droite", "gauche"):
                 distance_laterale = abs(prioritaire.get_y() - vehicule.get_y())
             else:
                 distance_laterale = abs(prioritaire.get_x() - vehicule.get_x())
-
             if distance_laterale > 60:
                 continue
-
             if direction == "droite":
                 distance = vehicule.get_x() - prioritaire.get_x()
             elif direction == "gauche":
@@ -694,10 +586,8 @@ class Simulation:
                 distance = prioritaire.get_y() - vehicule.get_y()
             else:
                 continue
-
             if -self.__distance_liberation_ecartement <= distance <= self.__distance_detection_ecartement:
                 return True
-
         return False
 
     def __vitesse_deplacement(self, vehicule):
@@ -709,38 +599,32 @@ class Simulation:
 
     def feux_sync(self):
         self.__time_remaining -= 1
-
         if self.__time_remaining <= 0:
             if self.__cycle_state == "horizontal_vert":
                 self.__feu_droite.set_etat("orange")
                 self.__feu_gauche.set_etat("orange")
                 self.__cycle_state = "horizontal_orange"
                 self.__time_remaining = 50
-
             elif self.__cycle_state == "horizontal_orange":
                 self.__feu_droite.set_etat("rouge")
                 self.__feu_gauche.set_etat("rouge")
                 self.__cycle_state = "tout_rouge_1"
                 self.__time_remaining = 50
-
             elif self.__cycle_state == "tout_rouge_1":
                 self.__feu_bas.set_etat("vert")
                 self.__feu_haut.set_etat("vert")
                 self.__cycle_state = "vertical_vert"
                 self.__time_remaining = 100
-
             elif self.__cycle_state == "vertical_vert":
                 self.__feu_bas.set_etat("orange")
                 self.__feu_haut.set_etat("orange")
                 self.__cycle_state = "vertical_orange"
                 self.__time_remaining = 50
-
             elif self.__cycle_state == "vertical_orange":
                 self.__feu_bas.set_etat("rouge")
                 self.__feu_haut.set_etat("rouge")
                 self.__cycle_state = "tout_rouge_2"
                 self.__time_remaining = 50
-
             elif self.__cycle_state == "tout_rouge_2":
                 self.__feu_droite.set_etat("vert")
                 self.__feu_gauche.set_etat("vert")
@@ -748,32 +632,17 @@ class Simulation:
                 self.__time_remaining = 50
 
     def __feu_bloque_direction(self, direction):
-        if direction == "droite":
-            return self.__feu_droite.get_etat() in ("rouge", "orange")
-
-        elif direction == "gauche":
-            return self.__feu_gauche.get_etat() in ("rouge", "orange")
-
-        elif direction == "bas":
-            return self.__feu_bas.get_etat() in ("rouge", "orange")
-
-        elif direction == "haut":
-            return self.__feu_haut.get_etat() in ("rouge", "orange")
-
-        return True
+        feu = self.__feu_de(direction)
+        return True if feu is None else feu.get_etat() in ("rouge", "orange")
 
     def __gerer_arret_feu(self, vehicule, vitesse):
         direction = vehicule.get_direction()
-
         ix = self.__intersection.get_x()
         iy = self.__intersection.get_y()
         il = self.__intersection.get_largeur()
         ih = self.__intersection.get_hauteur()
-
-        est_prioritaire = isinstance(vehicule,VehiculePrioritaire)
-
+        est_prioritaire = isinstance(vehicule, VehiculePrioritaire)
         prioritaire_actif = (est_prioritaire and self.__est_prioritaire_actif(vehicule))
-
         if prioritaire_actif:
             doit_bloquer = False
         elif est_prioritaire:
@@ -785,94 +654,72 @@ class Simulation:
             doit_bloquer = self.__feu_bloque_direction(direction)
             if (self.__direction_prioritaire_active() == direction):
                 doit_bloquer = True
-
         if direction == "droite":
             position_arret = ix - vehicule.get_largeur()
-
             if (vehicule.get_x() <= position_arret and vehicule.get_x() + vitesse >= position_arret):
                 if doit_bloquer:
                     vehicule.set_x(position_arret)
                     return True
-
         elif direction == "gauche":
             position_arret = ix + il
-
             if (vehicule.get_x() >= position_arret and vehicule.get_x() - vitesse <= position_arret):
                 if doit_bloquer:
                     vehicule.set_x(position_arret)
                     return True
-
         elif direction == "bas":
             position_arret = iy - vehicule.get_hauteur()
-
             if (vehicule.get_y() <= position_arret and vehicule.get_y() + vitesse >= position_arret):
                 if doit_bloquer:
                     vehicule.set_y(position_arret)
                     return True
-
         elif direction == "haut":
             position_arret = iy + ih
-
             if (vehicule.get_y() >= position_arret and vehicule.get_y() - vitesse <= position_arret):
                 if doit_bloquer:
                     vehicule.set_y(position_arret)
                     return True
-
         return False
 
     def voie_libre(self, vehicule):
         seuil = 50
-
         for autre in self.__vehicules:
             if autre is vehicule:
                 continue
-
             # HAUT -> BAS
             if vehicule.get_direction() == "bas":
                 if autre.get_direction() == "haut":
                     if abs(autre.get_y() - vehicule.get_y()) < seuil:
                         if autre.get_destination() in (None, "gauche"):
                             continue
-
                         if autre.get_destination() == "droite":
                             return False
-
             # BAS -> HAUT
             elif vehicule.get_direction() == "haut":
                 if autre.get_direction() == "bas":
                     if abs(autre.get_y() - vehicule.get_y()) < seuil:
                         if autre.get_destination() in (None, "droite"):
                             continue
-
                         if autre.get_destination() == "gauche":
                             return False
-
             # GAUCHE -> DROITE
             elif vehicule.get_direction() == "droite":
                 if autre.get_direction() == "gauche":
                     if abs(autre.get_x() - vehicule.get_x()) < seuil:
                         if autre.get_destination() in (None, "bas"):
                             continue
-
                         if autre.get_destination() == "haut":
                             return False
-
             # DROITE -> GAUCHE
             elif vehicule.get_direction() == "gauche":
                 if autre.get_direction() == "droite":
                     if abs(autre.get_x() - vehicule.get_x()) < seuil:
                         if autre.get_destination() in (None, "haut"):
                             continue
-
                         if autre.get_destination() == "bas":
                             return False
-
         return True
 
     def __voie_reservee_pendant_ecartement(self, vehicule, autre):
-        # Garder la place longitudinale du véhicule qui se rabat :
-        # une voiture derrière lui ne doit pas avancer dans sa place,
-        # même si elle est à 28 pixels sur le côté.
         if isinstance(vehicule, VehiculePrioritaire) or isinstance(autre, VehiculePrioritaire):
             return False
         if vehicule.get_direction() != autre.get_direction():
@@ -880,7 +727,6 @@ class Simulation:
         if (vehicule not in self.__vehicules_ecartes_ce_tick
                 and autre not in self.__vehicules_ecartes_ce_tick):
             return False
-
         direction = vehicule.get_direction()
         if direction in ("droite", "gauche"):
             lateral = abs(autre.get_y() - vehicule.get_y())
@@ -890,12 +736,8 @@ class Simulation:
             lateral = abs(autre.get_x() - vehicule.get_x())
             distance = autre.get_y() - vehicule.get_y()
             taille = (vehicule.get_hauteur() + autre.get_hauteur()) / 2
-
         if direction in ("gauche", "haut"):
             distance = -distance
-
-        # Les autres voies restent indépendantes ; seul le couloir
-        # de circulation des deux voitures doit être réservé.
         return lateral < 60 and 0 <= distance <= taille + 10 + vehicule.get_vitesse()
 
     def __cote_clignotant(self, direction, destination):
@@ -905,205 +747,185 @@ class Simulation:
             "bas": {"droite": "gauche", "gauche": "droite"},
             "haut": {"gauche": "gauche", "droite": "droite"}
         }
-
         return directions.get(direction, {}).get(destination)
 
-    def avancer(self):
+    def __signaler_clignotants(self, vehicule):
+        # Clignotants pour les changements de direction au carrefour.
+        if vehicule.get_destination() is not None:
+            distance = self.__distance_avant_intersection(vehicule)
+            if 0 <= distance <= 120:
+                cote = self.__cote_clignotant(vehicule.get_direction(), vehicule.get_destination())
+                if cote is not None:
+                    vehicule.activer_clignotant(cote)
+        # Signalisation de l'entrée dans le parking.
+        if vehicule.get_veut_se_garer() and vehicule.get_direction() == "gauche":
+            if 0 <= self.__centre(vehicule)[0] - self.__parking.get_entree()[0] <= 100:
+                vehicule.activer_clignotant("droite")
 
-        # GESTION DES URGENCES
-        self.__detecter_demandes_prioritaires()
+    def __gerer_direction(self, vehicule):
+        doit_s_arreter = False
+        # GAUCHE -> DROITE
+        if vehicule.get_direction() == "droite":
+            # Virage vers le haut
+            if vehicule.get_destination() == "haut":
+                centre_voie_haut = (
+                        self.__intersection.get_x()
+                        + self.__intersection.get_largeur() * 3 // 4
+                )
+                if vehicule.get_x() >= centre_voie_haut:
+                    if self.est_manoeuvre_libre(vehicule, "haut"):
+                        vehicule.set_x(centre_voie_haut)
+                        vehicule.set_direction("haut")
+                        vehicule.set_destination(None)
+                    else:
+                        doit_s_arreter = True
+            # Virage vers le bas
+            if vehicule.get_destination() == "bas":
+                centre_voie_bas = (
+                        self.__intersection.get_x()
+                        + self.__intersection.get_largeur() // 4
+                )
+                if vehicule.get_x() >= centre_voie_bas:
+                    if self.est_manoeuvre_libre(vehicule, "bas"):
+                        vehicule.set_x(centre_voie_bas)
+                        vehicule.set_direction("bas")
+                        vehicule.set_destination(None)
+                    else:
+                        doit_s_arreter = True
+        # Véhicule allant de droite à gauche
+        elif vehicule.get_direction() == "gauche":
+            position_arret = self.__intersection.get_x() + self.__intersection.get_largeur()
+            if self.__feu_gauche.get_etat() in ("rouge", "orange"):
+                if vehicule.get_x() >= position_arret:
+                    if vehicule.get_x() - vehicule.get_vitesse() <= position_arret:
+                        vehicule.set_x(position_arret)
+                        doit_s_arreter = True
+            # Véhicule qui va tourner dans la direction haut
+            if vehicule.get_destination() == "haut":
+                centre_voie_haut = self.__intersection.get_x() + self.__intersection.get_largeur() * 3 // 4
+                if vehicule.get_x() <= centre_voie_haut:
+                    if self.est_manoeuvre_libre(vehicule, "haut"):
+                        vehicule.set_x(centre_voie_haut)
+                        vehicule.set_direction("haut")
+                        vehicule.set_destination(None)
+                    else:
+                        doit_s_arreter = True
+            # Véhicule qui va tourner dans la direction bas
+            if vehicule.get_destination() == "bas":
+                centre_voie_bas = self.__intersection.get_x() + self.__intersection.get_largeur() // 4
+                if vehicule.get_x() <= centre_voie_bas:
+                    if self.est_manoeuvre_libre(vehicule, "bas"):
+                        vehicule.set_x(centre_voie_bas)
+                        vehicule.set_direction("bas")
+                        vehicule.set_destination(None)
+                    else:
+                        doit_s_arreter = True
+        # Véhicule allant de haut à bas
+        elif vehicule.get_direction() == "bas":
+            position_arret = self.__intersection.get_y() - 30
+            if self.__feu_bas.get_etat() in ("rouge", "orange"):
+                if vehicule.get_y() <= position_arret:
+                    if vehicule.get_y() + vehicule.get_vitesse() >= position_arret:
+                        vehicule.set_y(position_arret)
+                        doit_s_arreter = True
+            # Véhicule qui va tourner dans la direction droite
+            if vehicule.get_destination() == "droite":
+                centre_voie_droite = self.__intersection.get_y() + self.__intersection.get_hauteur() * 3 // 4
+                if vehicule.get_y() >= centre_voie_droite:
+                    if self.est_manoeuvre_libre(vehicule, "droite"):
+                        vehicule.set_y(centre_voie_droite)
+                        vehicule.set_direction("droite")
+                        vehicule.set_destination(None)
+                    else:
+                        doit_s_arreter = True
+            # Véhicule qui va tourner dans la direction gauche
+            if vehicule.get_destination() == "gauche":
+                centre_voie_gauche = self.__intersection.get_y() + self.__intersection.get_hauteur() // 4
+                if vehicule.get_y() >= centre_voie_gauche:
+                    if self.est_manoeuvre_libre(vehicule, "gauche"):
+                        vehicule.set_y(centre_voie_gauche)
+                        vehicule.set_direction("gauche")
+                        vehicule.set_destination(None)
+                    else:
+                        doit_s_arreter = True
+        # Véhicule allant de bas à haut
+        elif vehicule.get_direction() == "haut":
+            position_arret = self.__intersection.get_y() + self.__intersection.get_hauteur()
+            if self.__feu_haut.get_etat() in ("rouge", "orange"):
+                if vehicule.get_y() >= position_arret:
+                    if vehicule.get_y() - vehicule.get_vitesse() <= position_arret:
+                        vehicule.set_y(position_arret)
+                        doit_s_arreter = True
+            # Véhicule qui va tourner dans la direction droite
+            if vehicule.get_destination() == "droite":
+                centre_voie_droite = self.__intersection.get_y() + self.__intersection.get_hauteur() * 3 // 4
+                if vehicule.get_y() <= centre_voie_droite:
+                    if self.est_manoeuvre_libre(vehicule, "droite"):
+                        vehicule.set_y(centre_voie_droite)
+                        vehicule.set_direction("droite")
+                        vehicule.set_destination(None)
+                    else:
+                        doit_s_arreter = True
+            # Véhicule qui va tourner dans la direction gauche
+            if vehicule.get_destination() == "gauche":
+                centre_voie_gauche = self.__intersection.get_y() + self.__intersection.get_hauteur() // 4
+                if vehicule.get_y() <= centre_voie_gauche:
+                    if self.est_manoeuvre_libre(vehicule, "gauche"):
+                        vehicule.set_y(centre_voie_gauche)
+                        vehicule.set_direction("gauche")
+                        vehicule.set_destination(None)
+                    else:
+                        doit_s_arreter = True
+        return doit_s_arreter
 
-        if self.__etat_priorite is None:
-            self.feux_sync()
-        else:
-            self.__mettre_a_jour_priorite()
+    def __voiture_devant(self, vehicule):
+        direction = vehicule.get_direction()
+        for autre in self.__vehicules:
+            if autre is vehicule:
+                continue
+            if self.__voie_reservee_pendant_ecartement(vehicule, autre):
+                return True
+            if (self.__est_prioritaire_actif(vehicule)
+                    and not isinstance(autre, VehiculePrioritaire)
+                    and autre.est_ecarte_urgence()):
+                continue
+            dx = autre.get_x() - vehicule.get_x()
+            dy = autre.get_y() - vehicule.get_y()
+            devant = ((direction == "droite" and dx > 0 and abs(dy) < 22)
+                      or (direction == "gauche" and dx < 0 and abs(dy) < 22)
+                      or (direction == "bas" and dy > 0 and abs(dx) < 22)
+                      or (direction == "haut" and dy < 0 and abs(dx) < 22))
+            if devant and (dx ** 2 + dy ** 2) ** 0.5 < 40:
+                return True
+        return False
 
-        self.__mettre_a_jour_ecartement_urgence()
-
-        for vehicule in self.__vehicules:
-            doit_s_arreter = False
+    def mettre_a_jour_vehicule(self, vehicule):
+        with self.__verrou:
+            if vehicule not in self.__vehicules:
+                return
             vehicule.mettre_a_jour_clignotant()
-
             if vehicule.get_etat() != "route":
                 self.__gerer_parking(vehicule)
-                continue
-
+                return
             vitesse = self.__vitesse_deplacement(vehicule)
-
-            # Clignotants pour les changements de direction au carrefour.
-            if vehicule.get_destination() is not None:
-                distance = self.__distance_avant_intersection(vehicule)
-                if 0 <= distance <= 120:
-                    cote = self.__cote_clignotant(vehicule.get_direction(), vehicule.get_destination())
-                    if cote is not None:
-                        vehicule.activer_clignotant(cote)
-
-            # Signalisation de l'entrée dans le parking.
-            if vehicule.get_veut_se_garer() and vehicule.get_direction() == "gauche":
-                x_entree = self.__parking.get_entree()[0]
-                centre_x, centre_y = self.__centre(vehicule)
-                if 0 <= centre_x - x_entree <= 100:
-                    vehicule.activer_clignotant("droite")
-
-            if self.__gerer_arret_feu(vehicule, vitesse):
+            self.__signaler_clignotants(vehicule)
+            doit_s_arreter = self.__gerer_arret_feu(vehicule, vitesse)
+            if self.__gerer_direction(vehicule):
                 doit_s_arreter = True
-
-            # GAUCHE -> DROITE
-            if vehicule.get_direction() == "droite":
-
-                # Virage vers le haut
-                if vehicule.get_destination() == "haut":
-                    centre_voie_haut = (
-                            self.__intersection.get_x()
-                            + self.__intersection.get_largeur() * 3 // 4
-                    )
-
-                    if vehicule.get_x() >= centre_voie_haut:
-                        if self.est_manoeuvre_libre(vehicule, "haut"):
-                            vehicule.set_x(centre_voie_haut)
-                            vehicule.set_direction("haut")
-                            vehicule.set_destination(None)
-                        else:
-                            doit_s_arreter = True
-
-                # Virage vers le bas
-                if vehicule.get_destination() == "bas":
-                    centre_voie_bas = (
-                            self.__intersection.get_x()
-                            + self.__intersection.get_largeur() // 4
-                    )
-
-                    if vehicule.get_x() >= centre_voie_bas:
-                        if self.est_manoeuvre_libre(vehicule, "bas"):
-                            vehicule.set_x(centre_voie_bas)
-                            vehicule.set_direction("bas")
-                            vehicule.set_destination(None)
-                        else:
-                            doit_s_arreter = True
-
-            # Véhicule allant de droite à gauche
-            elif vehicule.get_direction() == "gauche":
-                position_arret = self.__intersection.get_x() + self.__intersection.get_largeur()
-                if self.__feu_gauche.get_etat() in ("rouge", "orange"):
-                    if vehicule.get_x() >= position_arret:
-                        if vehicule.get_x() - vehicule.get_vitesse() <= position_arret:
-                            vehicule.set_x(position_arret)
-                            doit_s_arreter = True
-                # Véhicule qui va tourner dans la direction haut
-                if vehicule.get_destination() == "haut":
-                    centre_voie_haut = self.__intersection.get_x() + self.__intersection.get_largeur() * 3 // 4
-                    if vehicule.get_x() <= centre_voie_haut:
-                        if self.est_manoeuvre_libre(vehicule, "haut"):
-                            vehicule.set_x(centre_voie_haut)
-                            vehicule.set_direction("haut")
-                            vehicule.set_destination(None)
-                        else:
-                            doit_s_arreter = True
-                # Véhicule qui va tourner dans la direction bas
-                if vehicule.get_destination() == "bas":
-                    centre_voie_bas = self.__intersection.get_x() + self.__intersection.get_largeur() // 4
-                    if vehicule.get_x() <= centre_voie_bas:
-                        if self.est_manoeuvre_libre(vehicule, "bas"):
-                            vehicule.set_x(centre_voie_bas)
-                            vehicule.set_direction("bas")
-                            vehicule.set_destination(None)
-                        else:
-                            doit_s_arreter = True
-
-            # Véhicule allant de haut à bas
-            elif vehicule.get_direction() == "bas":
-                position_arret = self.__intersection.get_y() - 30
-                if self.__feu_bas.get_etat() in ("rouge", "orange"):
-                    if vehicule.get_y() <= position_arret:
-                        if vehicule.get_y() + vehicule.get_vitesse() >= position_arret:
-                            vehicule.set_y(position_arret)
-                            doit_s_arreter = True
-                # Véhicule qui va tourner dans la direction droite
-                if vehicule.get_destination() == "droite":
-                    centre_voie_droite = self.__intersection.get_y() + self.__intersection.get_hauteur() * 3 // 4
-                    if vehicule.get_y() >= centre_voie_droite:
-                        if self.est_manoeuvre_libre(vehicule, "droite"):
-                            vehicule.set_y(centre_voie_droite)
-                            vehicule.set_direction("droite")
-                            vehicule.set_destination(None)
-                        else:
-                            doit_s_arreter = True
-                # Véhicule qui va tourner dans la direction gauche
-                if vehicule.get_destination() == "gauche":
-                    centre_voie_gauche = self.__intersection.get_y() + self.__intersection.get_hauteur() // 4
-                    if vehicule.get_y() >= centre_voie_gauche:
-                        if self.est_manoeuvre_libre(vehicule, "gauche"):
-                            vehicule.set_y(centre_voie_gauche)
-                            vehicule.set_direction("gauche")
-                            vehicule.set_destination(None)
-                        else:
-                            doit_s_arreter = True
-
-            # Véhicule allant de bas à haut
-            elif vehicule.get_direction() == "haut":
-                position_arret = self.__intersection.get_y() + self.__intersection.get_hauteur()
-                if self.__feu_haut.get_etat() in ("rouge", "orange"):
-                    if vehicule.get_y() >= position_arret:
-                        if vehicule.get_y() - vehicule.get_vitesse() <= position_arret:
-                            vehicule.set_y(position_arret)
-                            doit_s_arreter = True
-                # Véhicule qui va tourner dans la direction droite
-                if vehicule.get_destination() == "droite":
-                    centre_voie_droite = self.__intersection.get_y() + self.__intersection.get_hauteur() * 3 // 4
-                    if vehicule.get_y() <= centre_voie_droite:
-                        if self.est_manoeuvre_libre(vehicule, "droite"):
-                            vehicule.set_y(centre_voie_droite)
-                            vehicule.set_direction("droite")
-                            vehicule.set_destination(None)
-                        else:
-                            doit_s_arreter = True
-                # Véhicule qui va tourner dans la direction gauche
-                if vehicule.get_destination() == "gauche":
-                    centre_voie_gauche = self.__intersection.get_y() + self.__intersection.get_hauteur() // 4
-                    if vehicule.get_y() <= centre_voie_gauche:
-                        if self.est_manoeuvre_libre(vehicule, "gauche"):
-                            vehicule.set_y(centre_voie_gauche)
-                            vehicule.set_direction("gauche")
-                            vehicule.set_destination(None)
-                        else:
-                            doit_s_arreter = True
-
-            for autre in self.__vehicules:
-                if autre is vehicule:
-                    continue
-
-                if self.__voie_reservee_pendant_ecartement(vehicule, autre):
-                    doit_s_arreter = True
-                    continue
-
-                # Le couloir dégagé par les véhicules écartés reste libre pour les secours.
-                if (self.__est_prioritaire_actif(vehicule)
-                        and not isinstance(autre, VehiculePrioritaire)
-                        and autre.est_ecarte_urgence()):
-                    continue
-
-                dx = autre.get_x() - vehicule.get_x()
-                dy = autre.get_y() - vehicule.get_y()
-
-                devant = False
-                if vehicule.get_direction() == "droite" and dx > 0 and abs(dy) < 22:
-                    devant = True
-                elif vehicule.get_direction() == "gauche" and dx < 0 and abs(dy) < 22:
-                    devant = True
-                elif vehicule.get_direction() == "bas" and dy > 0 and abs(dx) < 22:
-                    devant = True
-                elif vehicule.get_direction() == "haut" and dy < 0 and abs(dx) < 22:
-                    devant = True
-
-                if devant:
-                    distance = (dx ** 2 + dy ** 2) ** 0.5
-                    if distance < 40:
-                        doit_s_arreter = True
+            if self.__voiture_devant(vehicule):
+                doit_s_arreter = True
             if not doit_s_arreter:
-                if vehicule.get_veut_se_garer() and vehicule.get_direction() == "gauche":
-                    if self.__entrer_parking(vehicule):
-                        continue
+                if vehicule.get_veut_se_garer() and vehicule.get_direction() == "gauche" and self.__entrer_parking(vehicule):
+                    return
                 vehicule.avancer(vitesse)
 
-        self.spawn_vehicles()
-        self.despawn_vehicles()
+    def avancer(self):
+        with self.__verrou:
+            self.__detecter_demandes_prioritaires()
+            if self.__etat_priorite is None:
+                self.feux_sync()
+            else:
+                self.__mettre_a_jour_priorite()
+            self.__mettre_a_jour_ecartement_urgence()
+            self.spawn_vehicles()
+            self.despawn_vehicles()
