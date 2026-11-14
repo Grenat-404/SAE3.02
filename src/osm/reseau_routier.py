@@ -91,18 +91,43 @@ class ReseauRoutier:
         return {n for n, voisins in self.__voisins.items() if len(voisins) >= 3}
 
     def carrefours(self):
-        """Les carrefours trouvés sont indépendants de la ville."""
-        resultat = []
+        """Centres proposés dans le menu, sans les intersections trop proches.
+
+        Le réseau de circulation garde tous ses noeuds et ses carrefours.
+        Seule la liste des choix est simplifiée.
+        """
+        distance_minimale = 75  # mètres entre deux centres proposés
+        candidats = []
         for identifiant in self.get_intersections():
             noms = sorted(self.__rues[identifiant])
-            if noms:
-                nom = ' × '.join(noms[:3])
-            else:
-                nom = f'Carrefour #{identifiant}'
+            nom = ' × '.join(noms[:3]) if noms else f'Carrefour #{identifiant}'
             lat, lon = self.__noeuds[identifiant]
-            resultat.append({'id':identifiant, 'nom':nom,
-                             'latitude':lat, 'longitude':lon})
-        return sorted(resultat, key=lambda c: (c['nom'], c['id']))
+            candidats.append({
+                'id': identifiant, 'nom': nom,
+                'latitude': lat, 'longitude': lon,
+                'nb_rues': len(noms),
+                'nb_branches': len(self.__voisins[identifiant]),
+                'feu': self.a_feu_osm(identifiant),
+            })
+
+        # Choisir de préférence le vrai croisement de rues, plutôt qu'un
+        # noeud légèrement décalé sur une branche du même carrefour.
+        candidats.sort(key=lambda c: (
+            -c['nb_rues'], -int(c['feu']), -c['nb_branches'], c['nom'], c['id']
+        ))
+
+        retenus = []
+        for candidat in candidats:
+            if all(self.distance_metres(candidat['id'], autre['id'])
+                   >= distance_minimale for autre in retenus):
+                # Les champs supplémentaires servent seulement au classement.
+                retenus.append({
+                    'id': candidat['id'], 'nom': candidat['nom'],
+                    'latitude': candidat['latitude'],
+                    'longitude': candidat['longitude'],
+                })
+
+        return sorted(retenus, key=lambda c: (c['nom'], c['id']))
 
     def a_feu_osm(self, noeud):
         return noeud in self.__feux_osm
