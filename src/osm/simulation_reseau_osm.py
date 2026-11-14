@@ -187,9 +187,10 @@ class SimulationReseauOSM:
         }
 
     def get_etat_feu(self, noeud, precedent):
-        """Deux axes alternés, avec jaune et tout-rouge.
+        """Phases simulées des carrefours signalés comme équipés de feux dans OSM.
 
-        Les feux ici sont simulés même quand OSM ne signale aucun feu.
+        Les intersections sans feu OSM ne consultent plus cette méthode
+        pour autoriser les véhicules à passer.
         """
         x1, y1 = self.__positions[precedent]
         x2, y2 = self.__positions[noeud]
@@ -361,7 +362,12 @@ class SimulationReseauOSM:
             if verrou is voiture:
                 return cible, None
             urgence = self.__urgences_noeud.get(noeud)
-            autorise = (self.get_etat_feu(noeud, precedent) == 'vert')
+            # Un carrefour sans feu OSM ne doit pas imposer de rouge virtuel.
+            # On conserve la réservation du carrefour pour éviter les conflits.
+            autorise = (
+                not self.__reseau.a_feu_osm(noeud)
+                or self.get_etat_feu(noeud, precedent) == 'vert'
+            )
             if voiture.est_prioritaire():
                 autorise = urgence is None or urgence is voiture or (
                     urgence.get_urgence_id() == voiture.get_urgence_id())

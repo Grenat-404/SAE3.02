@@ -32,13 +32,7 @@ def dessiner_reseau_osm(painter, simulation, clignotant_tick):
     for a, b in dessin['segments']:
         painter.drawLine(QPointF(*a), QPointF(*b))
 
-    # Chaque carrefour possède ses feux simulés indépendamment.
-    for noeud, coord in dessin['intersections'].items():
-        x, y = coord
-        painter.setPen(QPen(QColor('#111111'), 1.5))
-        painter.setBrush(QColor('#ffffff'))
-        painter.drawEllipse(QPointF(x, y), 3, 3)
-
+    # Aucun point de debug pour les intersections : afficher les vrais feux seulement.
     couleurs_feux = {'vert':'#44ec56', 'orange':'#fec442', 'rouge':'#fa4444'}
     for noeud, precedent, (x,y) in dessin['feux']:
         etat = simulation.get_etat_feu(noeud, precedent)
@@ -79,4 +73,4 @@ def dessiner_reseau_osm(painter, simulation, clignotant_tick):
                      f'Mode multicarrefours : {len(simulation.get_vehicules())} véhicules')
     painter.setFont(QFont('Arial', 9))
     painter.drawText(16, painter.viewport().height() - 16,
-                     'Données © contributeurs OpenStreetMap — feux simulés')
+                     'Données © contributeurs OpenStreetMap — phases de feux simulées')
