@@ -1,0 +1,182 @@
+"""Adaptateur OSM pour le serveur historique, sans toucher à src/reseau/.
+
+Le serveur original garde son TCP, sa découverte UDP et son traitement des
+urgences. Seule une commande supplémentaire (carte_osm) change le moteur actif.
+"""
+import base64
+import json
+import re
+import threading
+import zlib
+from pathlib import Path
+
+from src.reseau import serveur as serveur_original
+from src.reseau.protocole import encoder
+from src.simulation.simulation import Simulation
+from src.osm.simulation_reseau_osm import SimulationReseauOSM
+
+
+class SimulationAvecOSM:
+    """Aiguillage entre le carrefour d'origine et le moteur multicarrefours."""
+
+    def __init__(self, moteur, largeur, hauteur):
+        self.__verrou = threading.RLock()
+        self.__largeur = largeur
+        self.__hauteur = hauteur
+        self.__moteur = moteur
+        self.__carte = None
+        self.__centre = None
+        self.__selection = "classique"
+        self.__plan = None
+        self.__plan_zip = None
+        self.__numero_image = 0
+
+    def changer_carte(self, carte, centre):
+        """Charge une nouvelle simulation, sans détruire la précédente si échec."""
+        with self.__verrou:
+            if carte is None:
+                nouveau = Simulation(self.__largeur, self.__hauteur)
+                plan = None
+                plan_zip = None
+                selection = "classique"
+            else:
+                if (type(carte) is not str
+                        or not re.fullmatch(r"[A-Za-z0-9_-]+\.osm", carte)):
+                    raise ValueError("Nom de carte OSM invalide")
+                if centre is None or not re.fullmatch(r"-?[0-9]+", str(centre)):
+                    raise ValueError("Identifiant de carrefour invalide")
+                dossier = Path(__file__).resolve().parents[2] / "data" / "maps"
+                chemin = dossier / carte
+                if not chemin.is_file():
+                    raise ValueError("Carte absente du serveur : " + carte)
+                nouveau = SimulationReseauOSM(
+                    str(chemin), str(centre), self.__largeur, self.__hauteur
+                )
+                plan = nouveau.get_dessin()
+                plan_json = json.dumps(plan, ensure_ascii=False,
+                                      separators=(",", ":")).encode("utf-8")
+                plan_zip = base64.b64encode(zlib.compress(plan_json, 3)).decode("ascii")
+                selection = carte + ":" + str(centre)
+
+            ancien = self.__moteur
+            self.__moteur = nouveau
+            self.__carte = carte
+            self.__centre = centre
+            self.__selection = selection
+            self.__plan = plan
+            self.__plan_zip = plan_zip
+            self.__numero_image = 0
+            if hasattr(ancien, "arreter"):
+                ancien.arreter()
+            print("[SERVEUR] Simulation :", selection, flush=True)
+
+    def reinitialiser(self):
+        with self.__verrou:
+            self.changer_carte(self.__carte, self.__centre)
+
+    def avancer(self):
+        with self.__verrou:
+            self.__moteur.avancer()
+
+    def creer_urgence(self, type_urgence, niveau_priorite, vehicules):
+        with self.__verrou:
+            return self.__moteur.creer_urgence(
+                type_urgence, niveau_priorite, vehicules
+            )
+
+    def exporter_etat_reseau(self):
+        with self.__verrou:
+            if self.__carte is None:
+                # La sérialisation existante et toutes ses données sont préservées.
+                etat = self.__moteur.exporter_etat_reseau()
+                etat["mode"] = "classique"
+                return etat
+
+            self.__numero_image += 1
+            vehicules = []
+            for voiture in self.__moteur.get_vehicules():
+                x, y, angle = voiture.position()
+                vehicules.append({
+                    "x": x, "y": y, "angle": angle,
+                    "couleur": voiture.get_couleur(),
+                    "service": voiture.get_service(),
+                    "clignotant": voiture.get_clignotant(),
+                    "prioritaire": voiture.est_prioritaire(),
+                })
+            feux = {
+                str(noeud) + "|" + str(precedent):
+                    self.__moteur.get_etat_feu(noeud, precedent)
+                for noeud, precedent, _ in self.__plan["feux"]
+            }
+            etat = {
+                "type": "etat",
+                "mode": "osm",
+                "selection": self.__selection,
+                "agents_osm": vehicules,
+                "feux_osm": feux,
+            }
+            # La géométrie n'est pas retransmise 33 fois par seconde.
+            # Répétition périodique pour les clients qui se reconnectent.
+            if self.__numero_image <= 12 or self.__numero_image % 40 == 0:
+                etat["plan_osm_zip"] = self.__plan_zip
+            return etat
+
+    def arreter(self):
+        with self.__verrou:
+            if hasattr(self.__moteur, "arreter"):
+                self.__moteur.arreter()
+
+
+class SessionClientAvecOSM(serveur_original.SessionClient):
+    """Ajoute une commande au protocole sans réécrire la session TCP."""
+
+    def _SessionClient__traiter(self, message):
+        if message.get("type") != "carte_osm":
+            return super()._SessionClient__traiter(message)
+
+        try:
+            carte = message.get("carte")
+            centre = message.get("carrefour")
+            if carte is None and centre is not None:
+                raise ValueError("Un carrefour ne peut pas être choisi sans carte")
+            self._SessionClient__serveur.changer_carte_osm(carte, centre)
+        except Exception as erreur:
+            # Le client existant affiche déjà les erreurs dans le panneau.
+            reponse = encoder({
+                "type": "reponse_urgence",
+                "ok": False,
+                "erreur": "Chargement OSM : " + str(erreur),
+            })
+            with self._SessionClient__verrou:
+                self._SessionClient__reponses.append(reponse)
+
+
+class ServeurAvecOSM(serveur_original.ServeurReseau):
+    """Réutilise intégralement les sockets et les threads existants."""
+
+    def __init__(self):
+        # La méthode privée d'acceptation de l'ancien serveur utilise ce nom.
+        serveur_original.SessionClient = SessionClientAvecOSM
+        super().__init__()
+
+    def initialiser_simulation(self, largeur, hauteur):
+        super().initialiser_simulation(largeur, hauteur)
+        with self._ServeurReseau__verrou_simulation:
+            simulation = self._ServeurReseau__simulation
+            if simulation is not None and not isinstance(simulation, SimulationAvecOSM):
+                self._ServeurReseau__simulation = SimulationAvecOSM(
+                    simulation, largeur, hauteur
+                )
+
+    def changer_carte_osm(self, carte, carrefour):
+        simulation = self.simulation()
+        if not isinstance(simulation, SimulationAvecOSM):
+            raise ValueError("Simulation non initialisée")
+        simulation.changer_carte(carte, carrefour)
+
+    def demander_reinitialisation(self):
+        simulation = self.simulation()
+        if isinstance(simulation, SimulationAvecOSM):
+            simulation.reinitialiser()
+        else:
+            super().demander_reinitialisation()

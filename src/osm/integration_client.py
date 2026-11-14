@@ -1,0 +1,126 @@
+"""Affichage OSM au-dessus de l'interface client existante.
+
+Pas de moteur de circulation sur le client : les agents et les feux sont
+toujours calculés par la VM serveur.
+"""
+import base64
+import json
+import zlib
+
+from PyQt6.QtGui import QPainter
+from PyQt6.QtWidgets import QMessageBox
+
+from src.gui.interface import Interface
+from src.gui.selecteur_osm import SelecteurOSM
+from src.gui.vue_reseau_osm import dessiner_reseau_osm
+from src.reseau.proxy import SimulationDistante
+
+
+class VehiculeDistantOSM:
+    """Même interface de dessin que VoitureReseau, avec des données JSON."""
+
+    def __init__(self, donnees):
+        self.__donnees = donnees
+
+    def position(self):
+        return (self.__donnees["x"], self.__donnees["y"],
+                self.__donnees["angle"])
+
+    def get_service(self):
+        return self.__donnees["service"]
+
+    def get_couleur(self):
+        return self.__donnees["couleur"]
+
+    def get_clignotant(self):
+        return self.__donnees["clignotant"]
+
+    def est_prioritaire(self):
+        return self.__donnees["prioritaire"]
+
+
+class SimulationDistanteAvecOSM(SimulationDistante):
+    def __init__(self, largeur, hauteur):
+        self.__selection = None
+        self.__dessin = None
+        super().__init__(largeur, hauteur)
+
+    def avancer(self):
+        super().avancer()
+        etat = self._SimulationDistante__etat_affiche
+        if etat.get("mode") != "osm":
+            self.__selection = None
+            self.__dessin = None
+            return
+        if self.__selection != etat.get("selection"):
+            self.__selection = etat.get("selection")
+            self.__dessin = None
+        if "plan_osm_zip" in etat:
+            try:
+                brut = zlib.decompress(base64.b64decode(etat["plan_osm_zip"]))
+                self.__dessin = json.loads(brut.decode("utf-8"))
+            except (ValueError, zlib.error, UnicodeDecodeError):
+                pass
+
+    def get_mode(self):
+        return self._SimulationDistante__etat_affiche.get("mode", "classique")
+
+    def get_dessin(self):
+        return self.__dessin or {
+            "segments": [], "intersections": {}, "feux": [],
+            "limite_droite": 1, "hauteur": 1,
+        }
+
+    def get_vehicules(self):
+        if self.get_mode() == "osm":
+            return [
+                VehiculeDistantOSM(d)
+                for d in self._SimulationDistante__etat_affiche.get("agents_osm", [])
+            ]
+        return super().get_vehicules()
+
+    def get_etat_feu(self, noeud, precedent):
+        cle = str(noeud) + "|" + str(precedent)
+        return self._SimulationDistante__etat_affiche.get(
+            "feux_osm", {}
+        ).get(cle, "rouge")
+
+    def choisir_carte(self, carrefour):
+        reseau = self._SimulationDistante__reseau
+        if not reseau.connecte():
+            raise ConnectionError("Serveur non connecté : réessayer après connexion")
+        if carrefour is None:
+            message = {"type": "carte_osm", "carte": None, "carrefour": None}
+        else:
+            from pathlib import Path
+            message = {
+                "type": "carte_osm",
+                "carte": Path(carrefour["chemin"]).name,
+                "carrefour": str(carrefour["id"]),
+            }
+        # Réutilise la file d'envoi TCP du client original.
+        reseau._ClientReseau__a_envoyer.put(message)
+
+
+class InterfaceAvecOSM(Interface):
+    def __init__(self, simulation):
+        super().__init__(simulation)
+        self.__selecteur = SelecteurOSM(self)
+        self.__selecteur.move(12, 12)
+        self.__selecteur.carrefour_charge.connect(self.__charger_carte)
+        self.__selecteur.show()
+        self.__selecteur.raise_()
+
+    def __charger_carte(self, carrefour):
+        try:
+            self.simulation.choisir_carte(carrefour)
+        except (ConnectionError, KeyError, ValueError) as erreur:
+            QMessageBox.warning(self, "Carte OSM", str(erreur))
+
+    def paintEvent(self, event):
+        if self.simulation.get_mode() != "osm":
+            return super().paintEvent(event)
+        painter = QPainter(self)
+        clignotant = self._Interface__compteur_clignotant
+        dessiner_reseau_osm(painter, self.simulation, clignotant)
+        painter.end()
