@@ -60,8 +60,6 @@ def dessiner_reseau_osm(painter, simulation, clignotant_tick):
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor(COULEURS.get(nom_couleur, '#aaaaaa')))
         painter.drawRect(-longueur//2, -largeur//2, longueur, largeur)
-        painter.setBrush(QColor('#a8cde3'))
-        painter.drawRect(longueur//2-8, -largeur//2+2, 6, largeur-4)
         for cote in ('gauche', 'droite'):
             allume = (agent.get_clignotant() == cote and clignotant_tick < 10)
             painter.setBrush(QColor('#ffaa00' if allume else '#c57a13'))

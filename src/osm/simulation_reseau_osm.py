@@ -137,7 +137,7 @@ class SimulationReseauOSM:
                 'et passant par une intersection. Essaie une zone plus grande.'
             )
         self.__dessin = self.__construire_dessin()
-        for _ in range(5):
+        for _ in range(12):
             self.__apparition()
 
     def get_vehicules(self):
@@ -163,6 +163,10 @@ class SimulationReseauOSM:
                 if suivant in self.__intersections:
                     entrants.setdefault(suivant, []).append(precedent)
         for noeud in self.__intersections:
+            # Afficher uniquement les feux réellement renseignés dans OSM.
+            # Les autres intersections restent gérées par le moteur de circulation.
+            if not self.__reseau.a_feu_osm(noeud):
+                continue
             x, y = self.__positions[noeud]
             if not (-30 < x < self.__limite_droite+30 and 80 < y < self.__hauteur+30):
                 continue
@@ -277,7 +281,7 @@ class SimulationReseauOSM:
         return True
 
     def __apparition(self):
-        if len(self.__agents) >= 40:
+        if len(self.__agents) >= 80:
             return
         chemin = self.__choisir_itineraire()
         if chemin:
@@ -382,7 +386,7 @@ class SimulationReseauOSM:
 
     def avancer(self):
         self.__tick += 1
-        if self.__generateur.random() < 0.025:
+        if self.__generateur.random() < 0.06:
             self.__apparition()
         for agent in list(self.__urgences_attente):
             if self.__depart_libre(agent):
