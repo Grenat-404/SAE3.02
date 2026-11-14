@@ -35,6 +35,8 @@ class Simulation:
     def __init__(self, largeur_ecran, hauteur_ecran):
         self.__verrou = threading.RLock()
         self.__threads = {}
+        self.__attente_virage = {}
+        self.__retenus_entree = set()
         self.__vehicules = []
         self.__routes = []
         self.__prochain_id_urgence = 1
@@ -61,8 +63,6 @@ class Simulation:
         centre_y = hauteur_ecran // 2
         self.__routes.append(Route(0, centre_y - largeur_route // 2, largeur_ecran, largeur_route))
         self.__routes.append(Route(centre_x - largeur_route // 2, 0, largeur_route, hauteur_ecran))
-        self.__routes.append(Route(1400, 200, 100, 300))
-        self.__routes.append(Route(1000, 100, 300, 100))
         self.__intersection = Intersection(centre_x - largeur_route // 2, centre_y - largeur_route // 2, largeur_route, largeur_route)
         ix = self.__intersection.get_x()
         iy = self.__intersection.get_y()
@@ -99,6 +99,8 @@ class Simulation:
             thread.start()
 
     def __arreter_thread(self, vehicule):
+        self.__attente_virage.pop(vehicule, None)
+        self.__retenus_entree.discard(vehicule)
         thread = self.__threads.pop(vehicule, None)
         if thread is not None:
             thread.arreter()
@@ -200,32 +202,114 @@ class Simulation:
                 return True
         return False
 
-    def est_manoeuvre_libre(self, vehicule, direction_cible):
-        cx, cy = self.__centre(vehicule)
-        largeur_virage = vehicule.get_largeur() * 1.2
-        hauteur_virage = vehicule.get_hauteur() * 1.2
-        if direction_cible == "haut":
-            target_x, target_y = cx, cy - hauteur_virage / 2
-        elif direction_cible == "bas":
-            target_x, target_y = cx, cy + hauteur_virage / 2
-        elif direction_cible == "droite":
-            target_x, target_y = cx + largeur_virage / 2, cy
+    def __rect_balayage(self, v, ticks):
+        """Rectangle de v + la distance qu'il va parcourir dans `ticks` ticks."""
+        cx, cy = self.__centre(v)
+        lg = max(v.get_largeur(), v.get_hauteur())
+        ep = min(v.get_largeur(), v.get_hauteur())
+        d = v.get_direction()
+        # un véhicule arrêté devant un feu rouge n'avance pas
+        arrete_au_feu = (self.__distance_avant_intersection(v) >= 0
+                         and not self.__est_prioritaire_actif(v)
+                         and self.__feu_bloque_direction(d))
+        avance = 0 if arrete_au_feu else max(v.get_vitesse(), 1) * ticks
+        if d in ("droite", "gauche"):
+            x0, x1 = cx - lg / 2, cx + lg / 2
+            y0, y1 = cy - ep / 2, cy + ep / 2
+            if d == "droite":
+                x1 += avance
+            else:
+                x0 -= avance
         else:
-            target_x, target_y = cx - largeur_virage / 2, cy
-        min_x = min(cx - largeur_virage / 2, target_x - largeur_virage / 2)
-        max_x = max(cx + largeur_virage / 2, target_x + largeur_virage / 2)
-        min_y = min(cy - hauteur_virage / 2, target_y - hauteur_virage / 2)
-        max_y = max(cy + hauteur_virage / 2, target_y + hauteur_virage / 2)
+            x0, x1 = cx - ep / 2, cx + ep / 2
+            y0, y1 = cy - lg / 2, cy + lg / 2
+            if d == "bas":
+                y1 += avance
+            else:
+                y0 -= avance
+        return x0, y0, x1, y1
+
+    def est_manoeuvre_libre(self, vehicule, direction_cible):
+        ix, iy = self.__intersection.get_x(), self.__intersection.get_y()
+        il, ih = self.__intersection.get_largeur(), self.__intersection.get_hauteur()
+        lg = max(vehicule.get_largeur(), vehicule.get_hauteur())
+        ep = min(vehicule.get_largeur(), vehicule.get_hauteur())
+        x, y = vehicule.get_x(), vehicule.get_y()
+        marge = 6
+        if direction_cible == "droite":
+            voie = iy + ih * 3 // 4
+            x0, x1 = x, ix + il + lg
+            y0, y1 = voie - marge, voie + ep + marge
+        elif direction_cible == "gauche":
+            voie = iy + ih // 4
+            x0, x1 = ix - lg, x + lg
+            y0, y1 = voie - marge, voie + ep + marge
+        elif direction_cible == "bas":
+            voie = ix + il // 4
+            x0, x1 = voie - marge, voie + ep + marge
+            y0, y1 = y, iy + ih + lg
+        else:  # haut
+            voie = ix + il * 3 // 4
+            x0, x1 = voie - marge, voie + ep + marge
+            y0, y1 = iy - lg, y + lg
+
+        attente = self.__attente_virage.get(vehicule, 0)
+        if attente > 300:  # sécurité anti-blocage total
+            self.__attente_virage.pop(vehicule, None)
+            return True
+
+        ticks = min(max(x1 - x0, y1 - y0) / max(vehicule.get_vitesse(), 1), 25)
+        if attente > 90:  # trop attendu : on ne regarde plus que les présences réelles
+            ticks = 0
+
+        libre = True
+        libre = True
         for autre in self.__vehicules:
             if autre is vehicule or autre.get_etat() != "route":
                 continue
-            ax, ay = self.__centre(autre)
-            collision_x = max(min_x, ax - autre.get_largeur() / 2) < min(max_x, ax + autre.get_largeur() / 2)
-            collision_y = max(min_y, ay - autre.get_hauteur() / 2) < min(max_y, ay + autre.get_hauteur() / 2)
-            if collision_x and collision_y:
-                return False
-        return True
+            if autre.get_direction() == vehicule.get_direction():
+                continue
+            # celui qui attend depuis moins longtemps me laisse passer
+            if autre in self.__attente_virage and \
+               (self.__attente_virage[autre], id(autre)) < (attente, id(vehicule)):
+                continue
+            # voiture qui attend pour tourner ou retenue à l'entrée = immobile
+            immobile = autre in self.__attente_virage or autre in self.__retenus_entree
+            t = 0 if immobile else ticks
+            ax0, ay0, ax1, ay1 = self.__rect_balayage(autre, t)
+            if ax0 < x1 and ax1 > x0 and ay0 < y1 and ay1 > y0:
+                libre = False
+                break
 
+        if libre:
+            self.__attente_virage.pop(vehicule, None)
+        else:
+            self.__attente_virage[vehicule] = attente + 1
+        return libre
+
+    def __intersection_occupee_pour(self, vehicule):
+        """True si le véhicule est à la ligne d'arrêt et qu'un véhicule de l'axe
+        perpendiculaire est encore dans l'intersection."""
+        if isinstance(vehicule, VehiculePrioritaire):
+            return False
+        d = self.__distance_avant_intersection(vehicule)
+        if not (0 <= d <= vehicule.get_vitesse() + 2):
+            return False
+        ix, iy = self.__intersection.get_x(), self.__intersection.get_y()
+        il, ih = self.__intersection.get_largeur(), self.__intersection.get_hauteur()
+        horiz = vehicule.get_direction() in ("droite", "gauche")
+        for autre in self.__vehicules:
+            if autre is vehicule or autre.get_etat() != "route":
+                continue
+            if autre in self.__attente_virage:
+                continue  # un voiture qui attend pour tourner ne doit pas nous bloquer
+            if (autre.get_direction() in ("droite", "gauche")) == horiz:
+                continue  # même axe : pas de conflit
+            cx, cy = self.__centre(autre)
+            if ix < cx < ix + il and iy < cy < iy + ih:
+                return True
+        return False
+    
     def __route_libre_sortie(self, vehicule):
         xs = self.__parking.get_sortie()[0]
         cy_sortant = self.__centre(vehicule)[1]
@@ -906,6 +990,11 @@ class Simulation:
                 doit_s_arreter = True
             if self.__voiture_devant(vehicule):
                 doit_s_arreter = True
+            if self.__intersection_occupee_pour(vehicule):
+                doit_s_arreter = True
+                self.__retenus_entree.add(vehicule)
+            else:
+                self.__retenus_entree.discard(vehicule)
             if not doit_s_arreter:
                 if vehicule.get_veut_se_garer() and vehicule.get_direction() == "gauche" and self.__entrer_parking(vehicule):
                     return
@@ -921,3 +1010,9 @@ class Simulation:
             self.__mettre_a_jour_ecartement_urgence()
             self.spawn_vehicles()
             self.despawn_vehicles()
+
+    def exporter_etat_reseau(self):
+        """Instantané cohérent pour le réseau (protégé par le verrou d'origine)."""
+        from src.reseau.etat import construire_etat
+        with self.__verrou:
+            return construire_etat(self)

@@ -90,6 +90,9 @@ class FenetreUrgence(QWidget):
         """)
 
         self.__creer_interface()
+        # La confirmation du serveur arrive sans bloquer le dessin Qt.
+        if hasattr(self.__simulation, 'reponse_urgence'):
+            self.__simulation.reponse_urgence.connect(self.__label_message.setText)
 
     def __creer_interface(self):
         layout_principal = QVBoxLayout(self)
@@ -597,16 +600,20 @@ class FenetreUrgence(QWidget):
             self.__spin_priorite.value()
         )
 
-        urgence_id = (
-            self.__simulation.creer_urgence(
+        try:
+            urgence_id = self.__simulation.creer_urgence(
                 type_urgence,
                 niveau_priorite,
                 self.__vehicules_en_attente
             )
-        )
+        except (ConnectionError, TimeoutError, ValueError) as erreur:
+            self.__label_message.setText(str(erreur))
+            return
 
         self.__label_message.setText(
-            f"Urgence #{urgence_id} déclenchée."
+            "Demande envoyée au serveur, en attente de confirmation..."
+            if urgence_id is None
+            else f"Urgence #{urgence_id} déclenchée."
         )
 
         self.__vehicules_en_attente.clear()
