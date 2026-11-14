@@ -462,6 +462,11 @@ class FenetreUrgence(QWidget):
             bloc_liste
         )
 
+        # Bouton de réinitialisation
+        bouton_reset = QPushButton("↻ Réinitialiser la simulation")
+        bouton_reset.clicked.connect(self.__reinitialiser_simulation)
+        layout.addWidget(bouton_reset)
+
         # ==================================================
         # MESSAGE
         # ==================================================
@@ -619,3 +624,14 @@ class FenetreUrgence(QWidget):
         self.__vehicules_en_attente.clear()
 
         self.__liste_vehicules.clear()
+
+    def __reinitialiser_simulation(self):
+        try:
+            self.__simulation.reinitialiser()
+        except ConnectionError as erreur:
+            self.__label_message.setText(str(erreur))
+            return
+
+        self.__vehicules_en_attente.clear()
+        self.__liste_vehicules.clear()
+        self.__label_message.setText("Réinitialisation demandée au serveur.")

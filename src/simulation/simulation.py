@@ -87,6 +87,29 @@ class Simulation:
         self.__y_route_gauche = iy + ih // 4 + 10
         self.__largeur_ecran = largeur_ecran
         self.__hauteur_ecran = hauteur_ecran
+
+        # Passages piétons : mêmes positions que dans interface.py
+        self.__passages_pietons = {
+            "ouest": {
+                "x": ix - 67, "y": iy,
+                "largeur": 55, "hauteur": ih, "axe": "y"
+            },
+            "est": {
+                "x": ix + il + 12, "y": iy,
+                "largeur": 55, "hauteur": ih, "axe": "y"
+            },
+            "nord": {
+                "x": ix, "y": iy - 67,
+                "largeur": il, "hauteur": 55, "axe": "x"
+            },
+            "sud": {
+                "x": ix, "y": iy + ih + 12,
+                "largeur": il, "hauteur": 55, "axe": "x"
+            }
+        }
+
+        self.__pietons = {nom: [] for nom in self.__passages_pietons}
+
         for direction, destination in (("droite", None), ("gauche", "haut"), ("bas", None), ("haut", None)):
             pos = self.__spawn_pos[direction]
             self.__ajouter_vehicule(Vehicule(pos["x"], pos["y"], 4, direction, destination))
@@ -122,6 +145,233 @@ class Simulation:
         return self.__intersection
     def get_parking(self):
         return self.__parking
+
+
+    def get_pietons(self):
+        with self.__verrou:
+            return [
+                dict(pieton)
+                for groupe in self.__pietons.values()
+                for pieton in groupe
+            ]
+
+    def __passage_libre(self, passage):
+        """Vérifie qu'aucune voiture n'est sur le passage."""
+        x = passage["x"]
+        y = passage["y"]
+        largeur = passage["largeur"]
+        hauteur = passage["hauteur"]
+
+        for voiture in self.__vehicules:
+            if voiture.get_etat() != "route":
+                continue
+
+            if (voiture.get_x() < x + largeur + 2
+                    and voiture.get_x() + voiture.get_largeur() > x - 2
+                    and voiture.get_y() < y + hauteur + 2
+                    and voiture.get_y() + voiture.get_hauteur() > y - 2):
+                return False
+
+        return True
+
+    def __pieton_peut_partir(self, nom, passage):
+        """Le piéton traverse au rouge, hors urgence."""
+
+        if self.__etat_priorite is not None:
+            return False
+
+        if nom in ("ouest", "est"):
+            feux_rouges = (
+                self.__feu_droite.get_etat() == "rouge"
+                and self.__feu_gauche.get_etat() == "rouge"
+            )
+        else:
+            feux_rouges = (
+                self.__feu_bas.get_etat() == "rouge"
+                and self.__feu_haut.get_etat() == "rouge"
+            )
+
+        return feux_rouges and self.__passage_libre(passage)
+
+
+    def __mettre_a_jour_pietons(self):
+
+        maximum_pietons = 1
+        frequence = 350
+        vitesse = 3
+
+        for nom, passage in self.__passages_pietons.items():
+
+            groupe = self.__pietons[nom]
+            axe = passage["axe"]
+
+            # Génération de nouveaux piétons
+            if len(groupe) < maximum_pietons:
+
+                if random.randint(1, frequence) == 1:
+
+                    # Sens choisi aléatoirement
+                    sens = random.choice([-1, 1])
+
+                    # Eviter plusieurs piétons en attente
+                    # exactement du même côté
+                    deja_en_attente = any(
+                        p["etat"] == "attente" and p["sens"] == sens
+                        for p in groupe
+                    )
+
+                    if not deja_en_attente:
+
+                        # Passage Ouest ou Est
+                        if axe == "y":
+
+                            # Décalage latéral selon le sens
+                            decalage = -12 if sens == 1 else 12
+
+                            x = (
+                                passage["x"]
+                                + passage["largeur"] / 2
+                                + decalage
+                                + random.randint(-4, 4)
+                            )
+
+                            if sens == 1:
+                                y = passage["y"] - 8
+                            else:
+                                y = (
+                                    passage["y"]
+                                    + passage["hauteur"]
+                                    + 8
+                                )
+
+                        # Passage Nord ou Sud
+                        else:
+
+                            decalage = -12 if sens == 1 else 12
+
+                            y = (
+                                passage["y"]
+                                + passage["hauteur"] / 2
+                                + decalage
+                                + random.randint(-4, 4)
+                            )
+
+                            if sens == 1:
+                                x = passage["x"] - 8
+                            else:
+                                x = (
+                                    passage["x"]
+                                    + passage["largeur"]
+                                    + 8
+                                )
+
+                        groupe.append({
+                            "x": x,
+                            "y": y,
+                            "sens": sens,
+                            "etat": "attente"
+                        })
+
+            # Déplacement de tous les piétons du passage
+            for pieton in groupe[:]:
+
+                # Attendre l'autorisation de traverser
+                if pieton["etat"] == "attente":
+
+                    if not self.__pieton_peut_partir(
+                        nom, passage
+                    ):
+                        continue
+
+                    pieton["etat"] = "traverse"
+
+                # Avancer dans le sens choisi
+                pieton[axe] += pieton["sens"] * vitesse
+
+                # Longueur totale de traversée
+                dimension = (
+                    passage["hauteur"]
+                    if axe == "y"
+                    else passage["largeur"]
+                )
+
+                # Vérifier si le piéton a terminé
+                if pieton["sens"] == 1:
+                    termine = (
+                        pieton[axe]
+                        >= passage[axe] + dimension + 8
+                    )
+                else:
+                    termine = (
+                        pieton[axe]
+                        <= passage[axe] - 8
+                    )
+
+                # Supprimer uniquement ce piéton
+                if termine:
+                    groupe.remove(pieton)
+
+
+    def __vehicule_bloque_par_pieton(self, vehicule, vitesse):
+
+        if vitesse <= 0:
+            return False
+
+        direction = vehicule.get_direction()
+
+        mouvements = {
+            "droite": (1, 0),
+            "gauche": (-1, 0),
+            "bas": (0, 1),
+            "haut": (0, -1)
+        }
+
+        if direction not in mouvements:
+            return False
+
+        dx, dy = mouvements[direction]
+
+        # Position prévue du véhicule
+        x = vehicule.get_x() + dx * vitesse
+        y = vehicule.get_y() + dy * vitesse
+
+        largeur = vehicule.get_largeur()
+        hauteur = vehicule.get_hauteur()
+
+        # Vérifier tous les passages
+        for nom, groupe in self.__pietons.items():
+
+            passage = self.__passages_pietons[nom]
+
+            # Ne vérifier que les passages du bon axe
+            if direction in ("droite", "gauche"):
+                if passage["axe"] != "y":
+                    continue
+            else:
+                if passage["axe"] != "x":
+                    continue
+
+            px = passage["x"]
+            py = passage["y"]
+            pl = passage["largeur"]
+            ph = passage["hauteur"]
+
+            # Vérifier tous les piétons du passage
+            for pieton in groupe:
+
+                if pieton["etat"] != "traverse":
+                    continue
+
+                # Vérification de l'occupation du passage
+                if (
+                    x < px + pl + 2
+                    and x + largeur > px - 2
+                    and y < py + ph + 2
+                    and y + hauteur > py - 2
+                ):
+                    return True
+
+        return False
 
     def spawn_vehicles(self):
         if random.randint(1, 30) == 1 and len(self.__vehicules) < 30:
@@ -715,47 +965,88 @@ class Simulation:
 
     def __gerer_arret_feu(self, vehicule, vitesse):
         direction = vehicule.get_direction()
+
         ix = self.__intersection.get_x()
         iy = self.__intersection.get_y()
         il = self.__intersection.get_largeur()
         ih = self.__intersection.get_hauteur()
+
+        # Distance entre l'intersection et la ligne d'arrêt
+        distance_arret = 75
+
+        # Gestion des véhicules prioritaires
         est_prioritaire = isinstance(vehicule, VehiculePrioritaire)
-        prioritaire_actif = (est_prioritaire and self.__est_prioritaire_actif(vehicule))
+        prioritaire_actif = (
+            est_prioritaire and self.__est_prioritaire_actif(vehicule)
+        )
+
         if prioritaire_actif:
             doit_bloquer = False
+
         elif est_prioritaire:
             if vehicule in self.__vehicules_prioritaires_connus:
                 doit_bloquer = True
             else:
                 doit_bloquer = self.__feu_bloque_direction(direction)
+
         else:
             doit_bloquer = self.__feu_bloque_direction(direction)
-            if (self.__direction_prioritaire_active() == direction):
+
+            if self.__direction_prioritaire_active() == direction:
                 doit_bloquer = True
+
+        # Pas d'arrêt si le véhicule est autorisé à passer
+        if not doit_bloquer:
+            return False
+
+        # Véhicules allant vers la droite
         if direction == "droite":
-            position_arret = ix - vehicule.get_largeur()
-            if (vehicule.get_x() <= position_arret and vehicule.get_x() + vitesse >= position_arret):
-                if doit_bloquer:
-                    vehicule.set_x(position_arret)
-                    return True
+            position_arret = (
+                ix - distance_arret - vehicule.get_largeur()
+            )
+
+            if (
+                vehicule.get_x() <= position_arret
+                and vehicule.get_x() + vitesse >= position_arret
+            ):
+                vehicule.set_x(position_arret)
+                return True
+
+        # Véhicules allant vers la gauche
         elif direction == "gauche":
-            position_arret = ix + il
-            if (vehicule.get_x() >= position_arret and vehicule.get_x() - vitesse <= position_arret):
-                if doit_bloquer:
-                    vehicule.set_x(position_arret)
-                    return True
+            position_arret = ix + il + distance_arret
+
+            if (
+                vehicule.get_x() >= position_arret
+                and vehicule.get_x() - vitesse <= position_arret
+            ):
+                vehicule.set_x(position_arret)
+                return True
+
+        # Véhicules allant vers le bas
         elif direction == "bas":
-            position_arret = iy - vehicule.get_hauteur()
-            if (vehicule.get_y() <= position_arret and vehicule.get_y() + vitesse >= position_arret):
-                if doit_bloquer:
-                    vehicule.set_y(position_arret)
-                    return True
+            position_arret = (
+                iy - distance_arret - vehicule.get_hauteur()
+            )
+
+            if (
+                vehicule.get_y() <= position_arret
+                and vehicule.get_y() + vitesse >= position_arret
+            ):
+                vehicule.set_y(position_arret)
+                return True
+
+        # Véhicules allant vers le haut
         elif direction == "haut":
-            position_arret = iy + ih
-            if (vehicule.get_y() >= position_arret and vehicule.get_y() - vitesse <= position_arret):
-                if doit_bloquer:
-                    vehicule.set_y(position_arret)
-                    return True
+            position_arret = iy + ih + distance_arret
+
+            if (
+                vehicule.get_y() >= position_arret
+                and vehicule.get_y() - vitesse <= position_arret
+            ):
+                vehicule.set_y(position_arret)
+                return True
+
         return False
 
     def voie_libre(self, vehicule):
@@ -840,14 +1131,17 @@ class Simulation:
 
     def __gerer_direction(self, vehicule):
         doit_s_arreter = False
+
         # GAUCHE -> DROITE
         if vehicule.get_direction() == "droite":
+
             # Virage vers le haut
             if vehicule.get_destination() == "haut":
                 centre_voie_haut = (
-                        self.__intersection.get_x()
-                        + self.__intersection.get_largeur() * 3 // 4
+                    self.__intersection.get_x()
+                    + self.__intersection.get_largeur() * 3 // 4
                 )
+
                 if vehicule.get_x() >= centre_voie_haut:
                     if self.est_manoeuvre_libre(vehicule, "haut"):
                         vehicule.set_x(centre_voie_haut)
@@ -855,12 +1149,14 @@ class Simulation:
                         vehicule.set_destination(None)
                     else:
                         doit_s_arreter = True
+
             # Virage vers le bas
             if vehicule.get_destination() == "bas":
                 centre_voie_bas = (
-                        self.__intersection.get_x()
-                        + self.__intersection.get_largeur() // 4
+                    self.__intersection.get_x()
+                    + self.__intersection.get_largeur() // 4
                 )
+
                 if vehicule.get_x() >= centre_voie_bas:
                     if self.est_manoeuvre_libre(vehicule, "bas"):
                         vehicule.set_x(centre_voie_bas)
@@ -868,17 +1164,17 @@ class Simulation:
                         vehicule.set_destination(None)
                     else:
                         doit_s_arreter = True
-        # Véhicule allant de droite à gauche
+
+        # DROITE -> GAUCHE
         elif vehicule.get_direction() == "gauche":
-            position_arret = self.__intersection.get_x() + self.__intersection.get_largeur()
-            if self.__feu_gauche.get_etat() in ("rouge", "orange"):
-                if vehicule.get_x() >= position_arret:
-                    if vehicule.get_x() - vehicule.get_vitesse() <= position_arret:
-                        vehicule.set_x(position_arret)
-                        doit_s_arreter = True
-            # Véhicule qui va tourner dans la direction haut
+
+            # Virage vers le haut
             if vehicule.get_destination() == "haut":
-                centre_voie_haut = self.__intersection.get_x() + self.__intersection.get_largeur() * 3 // 4
+                centre_voie_haut = (
+                    self.__intersection.get_x()
+                    + self.__intersection.get_largeur() * 3 // 4
+                )
+
                 if vehicule.get_x() <= centre_voie_haut:
                     if self.est_manoeuvre_libre(vehicule, "haut"):
                         vehicule.set_x(centre_voie_haut)
@@ -886,9 +1182,14 @@ class Simulation:
                         vehicule.set_destination(None)
                     else:
                         doit_s_arreter = True
-            # Véhicule qui va tourner dans la direction bas
+
+            # Virage vers le bas
             if vehicule.get_destination() == "bas":
-                centre_voie_bas = self.__intersection.get_x() + self.__intersection.get_largeur() // 4
+                centre_voie_bas = (
+                    self.__intersection.get_x()
+                    + self.__intersection.get_largeur() // 4
+                )
+
                 if vehicule.get_x() <= centre_voie_bas:
                     if self.est_manoeuvre_libre(vehicule, "bas"):
                         vehicule.set_x(centre_voie_bas)
@@ -896,17 +1197,17 @@ class Simulation:
                         vehicule.set_destination(None)
                     else:
                         doit_s_arreter = True
-        # Véhicule allant de haut à bas
+
+        # HAUT -> BAS
         elif vehicule.get_direction() == "bas":
-            position_arret = self.__intersection.get_y() - 30
-            if self.__feu_bas.get_etat() in ("rouge", "orange"):
-                if vehicule.get_y() <= position_arret:
-                    if vehicule.get_y() + vehicule.get_vitesse() >= position_arret:
-                        vehicule.set_y(position_arret)
-                        doit_s_arreter = True
-            # Véhicule qui va tourner dans la direction droite
+
+            # Virage vers la droite
             if vehicule.get_destination() == "droite":
-                centre_voie_droite = self.__intersection.get_y() + self.__intersection.get_hauteur() * 3 // 4
+                centre_voie_droite = (
+                    self.__intersection.get_y()
+                    + self.__intersection.get_hauteur() * 3 // 4
+                )
+
                 if vehicule.get_y() >= centre_voie_droite:
                     if self.est_manoeuvre_libre(vehicule, "droite"):
                         vehicule.set_y(centre_voie_droite)
@@ -914,9 +1215,14 @@ class Simulation:
                         vehicule.set_destination(None)
                     else:
                         doit_s_arreter = True
-            # Véhicule qui va tourner dans la direction gauche
+
+            # Virage vers la gauche
             if vehicule.get_destination() == "gauche":
-                centre_voie_gauche = self.__intersection.get_y() + self.__intersection.get_hauteur() // 4
+                centre_voie_gauche = (
+                    self.__intersection.get_y()
+                    + self.__intersection.get_hauteur() // 4
+                )
+
                 if vehicule.get_y() >= centre_voie_gauche:
                     if self.est_manoeuvre_libre(vehicule, "gauche"):
                         vehicule.set_y(centre_voie_gauche)
@@ -924,17 +1230,17 @@ class Simulation:
                         vehicule.set_destination(None)
                     else:
                         doit_s_arreter = True
-        # Véhicule allant de bas à haut
+
+        # BAS -> HAUT
         elif vehicule.get_direction() == "haut":
-            position_arret = self.__intersection.get_y() + self.__intersection.get_hauteur()
-            if self.__feu_haut.get_etat() in ("rouge", "orange"):
-                if vehicule.get_y() >= position_arret:
-                    if vehicule.get_y() - vehicule.get_vitesse() <= position_arret:
-                        vehicule.set_y(position_arret)
-                        doit_s_arreter = True
-            # Véhicule qui va tourner dans la direction droite
+
+            # Virage vers la droite
             if vehicule.get_destination() == "droite":
-                centre_voie_droite = self.__intersection.get_y() + self.__intersection.get_hauteur() * 3 // 4
+                centre_voie_droite = (
+                    self.__intersection.get_y()
+                    + self.__intersection.get_hauteur() * 3 // 4
+                )
+
                 if vehicule.get_y() <= centre_voie_droite:
                     if self.est_manoeuvre_libre(vehicule, "droite"):
                         vehicule.set_y(centre_voie_droite)
@@ -942,9 +1248,14 @@ class Simulation:
                         vehicule.set_destination(None)
                     else:
                         doit_s_arreter = True
-            # Véhicule qui va tourner dans la direction gauche
+
+            # Virage vers la gauche
             if vehicule.get_destination() == "gauche":
-                centre_voie_gauche = self.__intersection.get_y() + self.__intersection.get_hauteur() // 4
+                centre_voie_gauche = (
+                    self.__intersection.get_y()
+                    + self.__intersection.get_hauteur() // 4
+                )
+
                 if vehicule.get_y() <= centre_voie_gauche:
                     if self.est_manoeuvre_libre(vehicule, "gauche"):
                         vehicule.set_y(centre_voie_gauche)
@@ -952,6 +1263,7 @@ class Simulation:
                         vehicule.set_destination(None)
                     else:
                         doit_s_arreter = True
+
         return doit_s_arreter
 
     def __voiture_devant(self, vehicule):
@@ -995,10 +1307,16 @@ class Simulation:
                 self.__retenus_entree.add(vehicule)
             else:
                 self.__retenus_entree.discard(vehicule)
+
+            # Un piéton engagé est prioritaire sur le passage
+            if self.__vehicule_bloque_par_pieton(vehicule, vitesse):
+                doit_s_arreter = True
+
             if not doit_s_arreter:
                 if vehicule.get_veut_se_garer() and vehicule.get_direction() == "gauche" and self.__entrer_parking(vehicule):
                     return
                 vehicule.avancer(vitesse)
+
 
     def avancer(self):
         with self.__verrou:
@@ -1008,6 +1326,7 @@ class Simulation:
             else:
                 self.__mettre_a_jour_priorite()
             self.__mettre_a_jour_ecartement_urgence()
+            self.__mettre_a_jour_pietons()
             self.spawn_vehicles()
             self.despawn_vehicles()
 

@@ -1,4 +1,3 @@
-"""Adaptateur à l'interface PyQt6 ORIGINALE: aucune règle de trafic côté client."""
 import threading
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -91,4 +90,10 @@ class SimulationDistante(QObject):
 
     def creer_urgence(self, type_urgence, niveau_priorite, vehicules):
         self.__reseau.envoyer_urgence(type_urgence, niveau_priorite, vehicules)
-        return None  # La véritable confirmation arrivera du serveur par signal Qt.
+        return None
+
+    def reinitialiser(self):
+        self.__reseau.envoyer_reinitialisation()
+
+    def get_pietons(self):
+        return self.__etat_affiche.get("pietons", [])

@@ -1,4 +1,3 @@
-"""Sérialisation de l'état du moteur original, sans modifier la logique."""
 from src.model.vehicule_prioritaire import VehiculePrioritaire
 
 
@@ -12,7 +11,6 @@ def rectangle(objet):
 
 
 def construire_etat(simulation):
-    """À appeler sous le RLock de Simulation (exporter_etat_reseau)."""
     parking = simulation.get_parking()
     intersection = simulation.get_intersections()
     vehicules = []
@@ -42,6 +40,7 @@ def construire_etat(simulation):
             for feu in simulation.get_feux()
         ],
         "vehicules": vehicules,
+        "pietons": simulation.get_pietons(),
         "parking": {
             "x": parking.get_x(),
             "y": parking.get_y(),

@@ -52,6 +52,12 @@ class ClientReseau(threading.Thread):
                                "vehicules": [dict(v) for v in vehicules]})
         return numero
 
+    def envoyer_reinitialisation(self):
+        if not self.connecte():
+            raise ConnectionError("Serveur non connecté")
+
+        self.__a_envoyer.put({"type": "reinitialiser"})
+
     def __decouvrir(self):
         # L'adresse réelle est récupérée depuis l'expéditeur de la réponse UDP.
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp:
