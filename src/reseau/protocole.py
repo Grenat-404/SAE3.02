@@ -42,9 +42,11 @@ class MoteurSimulation(Protocol):
 
 
 def encoder(message: dict[str, Any]) -> bytes:
+        """Fait avancer le traitement « avancer »."""
     return (json.dumps(message, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
 
 def decoder(ligne: bytes) -> dict[str, Any]:
+    """Exécute le traitement « decoder »."""
     if len(ligne) > TAILLE_MAXIMALE:
         raise ValueError("Trame réseau trop longue")
     message = json.loads(ligne.decode("utf-8"))
