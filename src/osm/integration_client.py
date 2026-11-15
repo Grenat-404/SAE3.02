@@ -8,7 +8,8 @@ import json
 import socket
 import zlib
 
-from PyQt6.QtGui import QPainter
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor, QPainter
 from PyQt6.QtWidgets import QMessageBox
 
 from src.gui.interface import Interface
@@ -135,6 +136,41 @@ class InterfaceAvecOSM(Interface):
             self.simulation.choisir_carte(carrefour)
         except (ConnectionError, KeyError, ValueError) as erreur:
             QMessageBox.warning(self, "Carte OSM", str(erreur))
+
+    def _Interface__dessiner_vehicule(self, painter, vehicule):
+        """Dessine les gyrophares du carrefour prédéfini, sans modifier l'interface originale."""
+        super()._Interface__dessiner_vehicule(painter, vehicule)
+
+        # Les véhicules classiques et le char ne reçoivent pas de gyrophare.
+        service = vehicule.get_type_service() if hasattr(
+            vehicule, "get_type_service"
+        ) else None
+        if service not in ("ambulance", "pompier", "police"):
+            return
+
+        x = int(vehicule.get_x())
+        y = int(vehicule.get_y())
+        largeur = int(vehicule.get_largeur())
+        hauteur = int(vehicule.get_hauteur())
+        taille = 5
+        espace = 2
+
+        # Les carrés sont sur le toit, au centre et perpendiculaires
+        # au sens de circulation (comme sur les véhicules OSM).
+        if vehicule.get_direction() in ("droite", "gauche"):
+            x_bleu = x + (largeur - taille) // 2
+            y_bleu = y + (hauteur - 2 * taille - espace) // 2
+            x_rouge, y_rouge = x_bleu, y_bleu + taille + espace
+        else:
+            x_bleu = x + (largeur - 2 * taille - espace) // 2
+            y_bleu = y + (hauteur - taille) // 2
+            x_rouge, y_rouge = x_bleu + taille + espace, y_bleu
+
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("#256bfa"))
+        painter.drawRect(x_bleu, y_bleu, taille, taille)
+        painter.setBrush(QColor("#ed3333"))
+        painter.drawRect(x_rouge, y_rouge, taille, taille)
 
     def paintEvent(self, event):
         if self.simulation.get_mode() != "osm":
