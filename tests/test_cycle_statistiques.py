@@ -10,25 +10,33 @@ from src.statistiques import BaseStatistiques
 
 
 class MoteurFictif:
+    """Représente MoteurFictif dans l'application."""
     def __init__(self):
+        """Initialise l'objet et ses attributs."""
         self.vehicules = [object(), object()]
         self.arrêts = 0
 
     def avancer(self):
+        """Exécute le traitement « avancer »."""
         self.vehicules.append(object())
 
     def get_vehicules(self):
+        """Récupère le traitement « get vehicules »."""
         return self.vehicules
 
     def creer_urgence(self, type_urgence, niveau_priorite, vehicules):
+        """Crée le traitement « creer urgence »."""
         return 1
 
     def arreter(self):
+        """Arrête le traitement « arreter »."""
         self.arrêts += 1
 
 
 class TestCycleDeVie(unittest.TestCase):
+    """Représente TestCycleDeVie dans l'application."""
     def test_arret_urgence_et_reinitialisation(self):
+        """Exécute le traitement « test arret urgence et reinitialisation »."""
         with tempfile.TemporaryDirectory() as dossier:
             chemin = Path(dossier) / "statistiques.db"
             bdd = BaseStatistiques(chemin)
