@@ -32,6 +32,7 @@ class SessionClient(threading.Thread):
         self.__reponses: deque[bytes] = deque()
 
     def arreter(self) -> None:
+        """Arrête le traitement « arreter »."""
         self.__actif = False
         try:
             self.__socket.shutdown(socket.SHUT_RDWR)
@@ -73,6 +74,7 @@ class SessionClient(threading.Thread):
             self.__serveur.demander_reinitialisation()
 
     def run(self) -> None:
+        """Exécute le traitement « run »."""
         connexion = self.__socket
         connexion.setblocking(False)
         tampon_reception = bytearray()
@@ -121,6 +123,7 @@ class SessionClient(threading.Thread):
 
 
 class ServeurReseau:
+    """Représente ServeurReseau dans l'application."""
     def __init__(self, port_tcp: int = PORT_TCP, port_udp: int = PORT_UDP) -> None:
         self.__port_tcp = port_tcp
         self.__port_udp = port_udp
@@ -136,9 +139,11 @@ class ServeurReseau:
         self.__reinitialisation_demandee = threading.Event()
 
     def actif(self) -> bool:
+        """Exécute le traitement « actif »."""
         return self.__actif.is_set()
 
     def simulation(self) -> MoteurSimulation | None:
+        """Exécute le traitement « simulation »."""
         with self.__verrou_simulation:
             return self.__simulation
 
@@ -156,6 +161,7 @@ class ServeurReseau:
                 print(f"[SERVEUR] Simulation originale : {largeur} x {hauteur}", flush=True)
 
     def demander_reinitialisation(self) -> None:
+        """Exécute le traitement « demander reinitialisation »."""
         self.__reinitialisation_demandee.set()
 
     def retirer_client(self, client: SessionClient) -> None:
@@ -163,6 +169,7 @@ class ServeurReseau:
             self.__clients.discard(client)
 
     def __decouverte(self) -> None:
+        """Exécute le traitement « decouverte »."""
         udp = self.__udp
 
         while self.actif():
@@ -176,6 +183,7 @@ class ServeurReseau:
                 break
 
     def __accepter(self) -> None:
+        """Exécute le traitement « accepter »."""
         tcp = self.__tcp
         while self.actif():
             try:
@@ -191,6 +199,7 @@ class ServeurReseau:
 
     # Partie principale : communication ou simulation
     def demarrer(self) -> None:
+        """Démarre le traitement « demarrer »."""
         tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
@@ -229,6 +238,7 @@ class ServeurReseau:
 
     # Partie principale : boucle serveur
     def tourner(self) -> None:
+        """Exécute le traitement « tourner »."""
         prochain = time.monotonic()
         while self.actif():
             if self.__reinitialisation_demandee.is_set():
@@ -256,6 +266,7 @@ class ServeurReseau:
                 prochain = time.monotonic()
 
     def arreter(self) -> None:
+        """Arrête le traitement « arreter »."""
         self.__actif.clear()
         if self.__tcp is not None:
             self.__tcp.close()
