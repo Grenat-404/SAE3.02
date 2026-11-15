@@ -9,6 +9,7 @@ from src.model.route import Route
 from src.model.place import Place
 
 class Parking:
+    """Représente Parking dans l'application."""
     def __init__(self, x: int, y: int, largeur: int, hauteur: int, trottoir: int = 20) -> None:
         self.__x = x
         self.__y = y
@@ -51,30 +52,41 @@ class Parking:
             self.__places.append(Place(x_debut + i * place_l, y_bas - place_h, place_l, place_h))
 
     def get_x(self) -> int:
+        """Récupère le traitement « get x »."""
         return self.__x
     def get_y(self) -> int:
+        """Récupère le traitement « get y »."""
         return self.__y
     def get_voies(self) -> list[Route]:
+        """Récupère le traitement « get voies »."""
         return self.__voies
     def get_places(self) -> list[Place]:
+        """Récupère le traitement « get places »."""
         return self.__places
     def get_entree(self) -> tuple[int, int]:
+        """Récupère le traitement « get entree »."""
         return self.__entree
     def get_sortie(self) -> tuple[int, int]:
+        """Récupère le traitement « get sortie »."""
         return self.__sortie
     def get_ligne_arret_sortie(self) -> tuple[int, int, int]:
+        """Récupère le traitement « get ligne arret sortie »."""
         return self.__ligne_arret_sortie
 
     def get_nb_places(self) -> int:
+        """Récupère le traitement « get nb places »."""
         return len(self.__places)
 
     def get_nb_occupees(self) -> int:
+        """Récupère le traitement « get nb occupees »."""
         return sum(1 for place in self.__places if place.get_occupee())
 
     def get_nb_libres(self) -> int:
+        """Récupère le traitement « get nb libres »."""
         return self.get_nb_places() - self.get_nb_occupees()
 
     def get_place_libre(self) -> Place | None:
+        """Récupère le traitement « get place libre »."""
         libres = [place for place in self.__places if not place.get_occupee()]
         if not libres:
             return None
