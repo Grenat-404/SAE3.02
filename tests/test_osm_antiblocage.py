@@ -20,6 +20,26 @@ class SimulationAntibouchonTests(unittest.TestCase):
             sim.avancer()
             self.assertLessEqual(len(sim.get_vehicules()), 125)
 
+    def test_repartition_par_zones(self):
+        sim = self.simulation()
+        # Une zone vide doit être choisie beaucoup plus souvent qu'une
+        # zone contenant déjà de nombreux véhicules.
+        groupes = {0: ["nord"], 4: ["centre"], 8: ["sud"]}
+        occupation = [20, 0, 0, 0, 3, 0, 0, 0, 0]
+        tirages = [
+            sim._SimulationReseauOSM__choisir_noeud_reparti(
+                groupes, occupation
+            )
+            for _ in range(400)
+        ]
+        self.assertGreater(tirages.count("sud"), tirages.count("nord") * 4)
+
+        # La lecture spatiale doit bien différencier le haut et le bas.
+        self.assertNotEqual(
+            sim._SimulationReseauOSM__zone_ecran(200, 160),
+            sim._SimulationReseauOSM__zone_ecran(200, 820)
+        )
+
     def test_file_plus_serree_sans_superposition(self):
         sim = self.simulation()
         arriere = VoitureReseau(["1", "2"], [(0, 0), (400, 0)], 2.5, "green")

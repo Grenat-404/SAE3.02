@@ -156,6 +156,13 @@ class SimulationReseauOSM:
                 if max(hors_x, hors_y) <= 115:
                     self.__entrees_proches.append(noeud)
 
+        # Regrouper les entrées et sorties par zones de l'écran.
+        # Chaque zone est sélectionnée indépendamment du nombre de nœuds
+        # routiers qu'elle contient : pas de biais vers les grandes rues.
+        self.__groupes_entrees = self.__grouper_zones(self.__entrees)
+        self.__groupes_entrees_proches = self.__grouper_zones(self.__entrees_proches)
+        self.__groupes_sorties = self.__grouper_zones(self.__sorties)
+
         # On vérifie qu'au moins un chemin atteignable traverse une intersection.
         if not self.__choisir_itineraire():
             raise ValueError(
@@ -229,11 +236,45 @@ class SimulationReseauOSM:
             return 'vert'
         return 'orange' if jaune else 'rouge'
 
+    def __zone_ecran(self, x, y):
+        """Numéro de zone sur une grille de 3 colonnes et 3 lignes (0 à 8)."""
+        largeur = max(1, self.__limite_droite)
+        hauteur = max(1, self.__hauteur - 100)
+        # Les points de départ sont généralement juste hors de l'écran :
+        # on les associe à la bordure correspondante.
+        colonne = min(2, max(0, int(3 * x / largeur)))
+        ligne = min(2, max(0, int(3 * (y - 100) / hauteur)))
+        return ligne * 3 + colonne
+
+    def __grouper_zones(self, noeuds):
+        """Regroupe les routes d'entrée ou de sortie selon leur emplacement."""
+        groupes = {}
+        for noeud in noeuds:
+            x, y = self.__positions[noeud]
+            zone = self.__zone_ecran(x, y)
+            groupes.setdefault(zone, []).append(noeud)
+        return groupes
+
+    def __occupation_zones(self):
+        """Compte les véhicules actuellement visibles dans chaque zone."""
+        occupation = [0] * 9
+        for vehicule in self.__agents:
+            x, y, _ = vehicule.position()
+            if 0 <= x <= self.__limite_droite and 100 <= y <= self.__hauteur:
+                occupation[self.__zone_ecran(x, y)] += 1
+        return occupation
+
+    def __choisir_noeud_reparti(self, groupes, occupation):
+        """Choisit davantage les zones libres, sans favoriser les zones très maillées."""
+        zones = list(groupes)
+        if not zones:
+            return None
+        poids = [1 / (1 + occupation[zone]) for zone in zones]
+        zone = self.__generateur.choices(zones, weights=poids, k=1)[0]
+        return self.__generateur.choice(groupes[zone])
+
     def __choisir_itineraire(self, provenance=None, urgence=False, souhaite=None):
         candidats = self.__entrees
-        if (not urgence and self.__entrees_proches
-                and self.__generateur.random() < 0.85):
-            candidats = self.__entrees_proches
         if provenance in ('droite', 'gauche', 'bas', 'haut'):
             # Provenance = côté par lequel la voiture entre dans la zone.
             cx, cy = self.__positions[self.__centre_id]
@@ -252,8 +293,19 @@ class SimulationReseauOSM:
             paires = [(a,b) for a in candidats for b in self.__sorties]
             self.__generateur.shuffle(paires)
         else:
-            paires = [(self.__generateur.choice(candidats),
-                       self.__generateur.choice(self.__sorties)) for _ in range(45)]
+            occupation = self.__occupation_zones()
+            for _ in range(45):
+                # 55 % des départs au voisinage immédiat de la vue,
+                # 45 % sur les autres arrivées possibles.
+                groupes = self.__groupes_entrees
+                if (self.__groupes_entrees_proches
+                        and self.__generateur.random() < 0.55):
+                    groupes = self.__groupes_entrees_proches
+                debut = self.__choisir_noeud_reparti(groupes, occupation)
+                fin = self.__choisir_noeud_reparti(
+                    self.__groupes_sorties, occupation
+                )
+                paires.append((debut, fin))
 
         for debut, fin in paires:
             if debut == fin:
