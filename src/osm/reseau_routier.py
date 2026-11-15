@@ -39,6 +39,7 @@ class CandidatCarrefour(CarrefourOSM):
 class ReseauRoutier:
     """Représente ReseauRoutier dans l'application."""
     def __init__(self, fichier: str) -> None:
+        """Initialise l'objet et ses attributs."""
         self.__noeuds: dict[str, tuple[float, float]] = {}
         self.__graphe: defaultdict[str, list[tuple[str, float]]] = defaultdict(list)
         self.__segments: list[tuple[str, str]] = []
@@ -49,6 +50,7 @@ class ReseauRoutier:
 
     # Partie principale : traitement principal
     def __lire(self, fichier: str) -> None:
+        """Exécute le traitement « lire »."""
         racine = ET.parse(fichier).getroot()
         if racine.tag != 'osm':
             raise ValueError('Le fichier doit être un .osm XML.')
@@ -149,9 +151,11 @@ class ReseauRoutier:
         return sorted(retenus, key=lambda c: (c['nom'], c['id']))
 
     def a_feu_osm(self, noeud: str) -> bool:
+        """Exécute le traitement « a feu osm »."""
         return noeud in self.__feux_osm
 
     def distance_metres(self, a: str, b: str) -> float:
+        """Exécute le traitement « distance metres »."""
         lat1, lon1 = self.__noeuds[a]
         lat2, lon2 = self.__noeuds[b]
         dy = math.radians(lat2 - lat1) * TERRE
