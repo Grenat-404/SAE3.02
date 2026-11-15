@@ -12,6 +12,7 @@ from PyQt6.QtCore import QTimer, Qt
 from src.gui.fenetre_urgence import FenetreUrgence
 
 class Interface(QWidget):
+    """Représente Interface dans l'application."""
     def __init__(self, simulation: SimulationDistante) -> None:
         super().__init__()
 
@@ -29,6 +30,7 @@ class Interface(QWidget):
         self.__compteur_clignotant = 0
 
     def mettre_a_jour(self) -> None:
+        """Met à jour le traitement « mettre a jour »."""
         self.simulation.avancer()
         self.__compteur_clignotant = (self.__compteur_clignotant + 1) % 20
         self.update()
