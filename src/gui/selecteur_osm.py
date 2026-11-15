@@ -2,17 +2,19 @@
 Sélection des fichiers de cartes OSM et de leurs carrefours.
 Le sélecteur envoie le centre choisi au client connecté.
 """
+from __future__ import annotations
+
 from pathlib import Path
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import (QComboBox, QFrame, QHBoxLayout, QLabel, QPushButton, QMessageBox)
+from PyQt6.QtWidgets import (QComboBox, QFrame, QHBoxLayout, QLabel, QPushButton, QMessageBox, QWidget)
 from src.osm.reseau_routier import ReseauRoutier
 
 class SelecteurOSM(QFrame):
     carrefour_charge = pyqtSignal(object)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.__cartes = {}
+        self.__cartes: dict[str, ReseauRoutier] = {}
         self.setStyleSheet('''
             QFrame {background-color:#252525; border:1px solid #555; border-radius:6px;}
             QLabel {color:white; border:none;}
@@ -37,14 +39,14 @@ class SelecteurOSM(QFrame):
         self.__actualiser()
         self.adjustSize()
 
-    def __lister_cartes(self):
+    def __lister_cartes(self) -> None:
         self.__combo_cartes.addItem('Carrefour prédéfini', None)
         dossier = Path(__file__).resolve().parents[2] / 'data' / 'maps'
         dossier.mkdir(parents=True, exist_ok=True)
         for fichier in sorted(dossier.glob('*.osm')):
             self.__combo_cartes.addItem(fichier.stem, str(fichier))
 
-    def __actualiser(self):
+    def __actualiser(self) -> None:
         self.__combo_carrefours.clear()
         chemin = self.__combo_cartes.currentData()
         if chemin is None:
@@ -66,7 +68,7 @@ class SelecteurOSM(QFrame):
         if not carrefours:
             self.__combo_carrefours.addItem('Aucune intersection détectée')
 
-    def __charger(self):
+    def __charger(self) -> None:
         chemin = self.__combo_cartes.currentData()
         if chemin is None:
             self.carrefour_charge.emit(None)

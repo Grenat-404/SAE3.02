@@ -2,12 +2,14 @@
 Gestion des places et des manœuvres du parking prédéfini.
 État et déplacements utilisés uniquement dans le mode classique.
 """
+from __future__ import annotations
+
 import random
 from src.model.route import Route
 from src.model.place import Place
 
 class Parking:
-    def __init__(self, x, y, largeur, hauteur, trottoir=20):
+    def __init__(self, x: int, y: int, largeur: int, hauteur: int, trottoir: int = 20) -> None:
         self.__x = x
         self.__y = y
         self.__largeur = largeur
@@ -48,42 +50,42 @@ class Parking:
         for i in range(nb_par_rangee):
             self.__places.append(Place(x_debut + i * place_l, y_bas - place_h, place_l, place_h))
 
-    def get_x(self):
+    def get_x(self) -> int:
         return self.__x
-    def get_y(self):
+    def get_y(self) -> int:
         return self.__y
-    def get_voies(self):
+    def get_voies(self) -> list[Route]:
         return self.__voies
-    def get_places(self):
+    def get_places(self) -> list[Place]:
         return self.__places
-    def get_entree(self):
+    def get_entree(self) -> tuple[int, int]:
         return self.__entree
-    def get_sortie(self):
+    def get_sortie(self) -> tuple[int, int]:
         return self.__sortie
-    def get_ligne_arret_sortie(self):
+    def get_ligne_arret_sortie(self) -> tuple[int, int, int]:
         return self.__ligne_arret_sortie
 
-    def get_nb_places(self):
+    def get_nb_places(self) -> int:
         return len(self.__places)
 
-    def get_nb_occupees(self):
+    def get_nb_occupees(self) -> int:
         return sum(1 for place in self.__places if place.get_occupee())
 
-    def get_nb_libres(self):
+    def get_nb_libres(self) -> int:
         return self.get_nb_places() - self.get_nb_occupees()
 
-    def get_place_libre(self):
+    def get_place_libre(self) -> Place | None:
         libres = [place for place in self.__places if not place.get_occupee()]
         if not libres:
             return None
         return random.choice(libres)
 
-    def get_trajet_entree(self, place):
+    def get_trajet_entree(self, place: Place) -> list[tuple[float, float]]:
         cx = place.get_x() + place.get_largeur() / 2
         cy = place.get_y() + place.get_hauteur() / 2
         return [ (self.__entree[0], self.__y_est), (cx, self.__y_est), (cx, cy) ]
 
-    def get_trajet_sortie(self, place, y_route):
+    def get_trajet_sortie(self, place: Place, y_route: float) -> list[tuple[float, float]]:
         cx = place.get_x() + place.get_largeur() / 2
         return [
             (cx, self.__y_ouest),

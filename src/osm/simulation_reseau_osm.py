@@ -2,14 +2,18 @@
 Moteur multicarrefours OSM exécuté exclusivement sur le serveur.
 Véhicules, trajets aléatoires, urgences fixes, feux, priorité et dégagement.
 """
+from __future__ import annotations
+
 import math
 import random
+from typing import Any
+from src.reseau.protocole import VehiculeUrgence
 
 from src.osm.reseau_routier import ReseauRoutier
 
 class VoitureReseau:
     """Véhicule qui suit un chemin de nœuds OSM ; attributs privés."""
-    def __init__(self, chemin, points, vitesse, couleur, service='', priorite=0, urgence_id=0):
+    def __init__(self, chemin: list[str], points: list[tuple[float, float]], vitesse: float, couleur: str, service: str = '', priorite: int = 0, urgence_id: int = 0) -> None:
         self.__chemin = chemin
         self.__points = points
         self.__vitesse = vitesse
@@ -25,46 +29,46 @@ class VoitureReseau:
         for a, b in zip(points, points[1:]):
             self.__distances.append(self.__distances[-1] + math.dist(a, b))
 
-    def get_chemin(self):
+    def get_chemin(self) -> list[str]:
         return self.__chemin
 
-    def get_points(self):
+    def get_points(self) -> list[tuple[float, float]]:
         return self.__points
 
-    def get_vitesse(self):
+    def get_vitesse(self) -> float:
         return self.__vitesse
 
-    def get_couleur(self):
+    def get_couleur(self) -> str:
         return self.__couleur
 
-    def get_service(self):
+    def get_service(self) -> str:
         return self.__service
 
-    def get_priorite(self):
+    def get_priorite(self) -> int:
         return self.__priorite
 
-    def get_urgence_id(self):
+    def get_urgence_id(self) -> int:
         return self.__urgence_id
 
-    def get_avancement(self):
+    def get_avancement(self) -> float:
         return self.__avancement
 
-    def set_avancement(self, valeur):
+    def set_avancement(self, valeur: float) -> None:
         self.__avancement = valeur
 
-    def get_longueur(self):
+    def get_longueur(self) -> float:
         return self.__distances[-1]
 
-    def get_clignotant(self):
+    def get_clignotant(self) -> str:
         return self.__clignotant
 
-    def set_clignotant(self, valeur):
+    def set_clignotant(self, valeur: str) -> None:
         self.__clignotant = valeur
 
-    def get_decalage(self):
+    def get_decalage(self) -> float:
         return self.__decalage
 
-    def ajuster_decalage(self, cible):
+    def ajuster_decalage(self, cible: float) -> None:
         """Glissement progressif vers l'accotement, sans téléportation."""
         pas = 0.8
         if self.__decalage < cible:
@@ -72,14 +76,14 @@ class VoitureReseau:
         elif self.__decalage > cible:
             self.__decalage = max(cible, self.__decalage - pas)
 
-    def get_indice_segment(self):
+    def get_indice_segment(self) -> int:
         """Indice du nœud d'arrivée du tronçon parcouru."""
         for i in range(1, len(self.__distances)):
             if self.__avancement <= self.__distances[i]:
                 return i
         return len(self.__distances) - 1
 
-    def marquer_detour(self, urgence_id, noeud):
+    def marquer_detour(self, urgence_id: int, noeud: str) -> bool:
         """Ne tente un détour qu'une fois à chaque carrefour et par urgence."""
         cle = (urgence_id, noeud)
         if cle in self.__essais_detour:
@@ -87,7 +91,7 @@ class VoitureReseau:
         self.__essais_detour.add(cle)
         return True
 
-    def changer_chemin(self, chemin, positions):
+    def changer_chemin(self, chemin: list[str], positions: dict[str, tuple[float, float]]) -> None:
         """Change la fin du parcours ; la portion déjà parcourue reste intacte."""
         i = self.get_indice_segment()
         if list(chemin[:i + 1]) != self.__chemin[:i + 1]:
@@ -98,13 +102,13 @@ class VoitureReseau:
         for a, b in zip(self.__points, self.__points[1:]):
             self.__distances.append(self.__distances[-1] + math.dist(a, b))
 
-    def est_prioritaire(self):
+    def est_prioritaire(self) -> bool:
         return bool(self.__service)
 
-    def distance_noeud(self, i):
+    def distance_noeud(self, i: int) -> float:
         return self.__distances[i]
 
-    def position(self):
+    def position(self) -> tuple[float, float, float]:
         s = max(0.0, min(self.__avancement, self.get_longueur()))
         for i in range(1, len(self.__points)):
             if s <= self.__distances[i]:
@@ -120,7 +124,7 @@ class VoitureReseau:
 
 
 class SimulationReseauOSM:
-    def __init__(self, chemin, carrefour_id, largeur, hauteur, graine=None):
+    def __init__(self, chemin: str, carrefour_id: str, largeur: int, hauteur: int, graine: int | None = None) -> None:
         self.__reseau = ReseauRoutier(chemin)
         self.__centre_id = str(carrefour_id)
         self.__positions, self.__limite_droite = self.__reseau.projeter(str(carrefour_id), largeur, hauteur)
@@ -199,13 +203,13 @@ class SimulationReseauOSM:
         for _ in range(22):
             self.__apparition()
 
-    def get_vehicules(self):
+    def get_vehicules(self) -> list[VoitureReseau]:
         return self.__agents
 
-    def get_dessin(self):
+    def get_dessin(self) -> dict[str, Any]:
         return self.__dessin
 
-    def __construire_dessin(self):
+    def __construire_dessin(self) -> dict[str, Any]:
         segments = []
         for a, b in self.__reseau.get_segments():
             p, q = self.__positions[a], self.__positions[b]
@@ -244,7 +248,7 @@ class SimulationReseauOSM:
                               and -30 <= self.__positions[n][0] <= self.__limite_droite + 30}
         }
 
-    def get_etat_feu(self, noeud, precedent):
+    def get_etat_feu(self, noeud: str, precedent: str) -> str:
         """Phases simulées des carrefours signalés comme équipés de feux dans OSM.
 
         Les intersections sans feu OSM ne consultent plus cette méthode
@@ -261,7 +265,7 @@ class SimulationReseauOSM:
             return 'vert'
         return 'orange' if jaune else 'rouge'
 
-    def __zone_ecran(self, x, y):
+    def __zone_ecran(self, x: float, y: float) -> int:
         """Numéro de zone sur une grille de 3 colonnes et 3 lignes (0 à 8)."""
         largeur = max(1, self.__limite_droite)
         hauteur = max(1, self.__hauteur - 100)
@@ -270,7 +274,7 @@ class SimulationReseauOSM:
         ligne = min(2, max(0, int(3 * (y - 100) / hauteur)))
         return ligne * 3 + colonne
 
-    def __grouper_zones(self, noeuds):
+    def __grouper_zones(self, noeuds: list[str]) -> dict[int, list[str]]:
         """Regroupe les routes d'entrée ou de sortie selon leur emplacement."""
         groupes = {}
         for noeud in noeuds:
@@ -279,7 +283,7 @@ class SimulationReseauOSM:
             groupes.setdefault(zone, []).append(noeud)
         return groupes
 
-    def __occupation_zones(self):
+    def __occupation_zones(self) -> list[int]:
         """Compte les véhicules actuellement visibles dans chaque zone."""
         occupation = [0] * 9
         for vehicule in self.__agents:
@@ -288,7 +292,7 @@ class SimulationReseauOSM:
                 occupation[self.__zone_ecran(x, y)] += 1
         return occupation
 
-    def __choisir_noeud_reparti(self, groupes, occupation):
+    def __choisir_noeud_reparti(self, groupes: dict[int, list[str]], occupation: list[int]) -> str | None:
         """Choisit davantage les zones libres, sans favoriser les zones très maillées."""
         zones = list(groupes)
         if not zones:
@@ -298,7 +302,7 @@ class SimulationReseauOSM:
         return self.__generateur.choice(groupes[zone])
 
     # Partie principale : gestion des urgences
-    def __itineraire_urgence_fixe(self, provenance, souhaite):
+    def __itineraire_urgence_fixe(self, provenance: str | None, souhaite: str | None) -> list[str] | None:
         """Même itinéraire pour un même carrefour et les mêmes directions.
 
         Un calcul Dijkstra sans hasard est mémorisé. Les demandes ultérieures
@@ -316,7 +320,7 @@ class SimulationReseauOSM:
         direction_sortie = souhaite if souhaite is not None else provenance
         angle_sortie = angles_sortie.get(direction_sortie)
 
-        def ecart_angle(noeud, angle):
+        def ecart_angle(noeud: str, angle: float | None) -> float:
             if angle is None:
                 return 0.0
             x, y = self.__positions[noeud]
@@ -382,7 +386,7 @@ class SimulationReseauOSM:
         return None
 
     # Partie principale : traitement principal
-    def __choisir_itineraire(self, provenance=None, urgence=False, souhaite=None):
+    def __choisir_itineraire(self, provenance: str | None = None, urgence: bool = False, souhaite: str | None = None) -> list[str] | None:
         if urgence:
             return self.__itineraire_urgence_fixe(provenance, souhaite)
 
@@ -411,7 +415,7 @@ class SimulationReseauOSM:
             return chemin
         return None
 
-    def __nouvelle_voiture(self, chemin, service='', priorite=0, urgence_id=0):
+    def __nouvelle_voiture(self, chemin: list[str], service: str = '', priorite: int = 0, urgence_id: int = 0) -> VoitureReseau:
         points = [self.__positions[n] for n in chemin]
         voiture = VoitureReseau(
             chemin, points, 3.4 if service else self.__generateur.uniform(2.0, 3.0),
@@ -420,7 +424,7 @@ class SimulationReseauOSM:
         )
         return voiture
 
-    def __depart_libre(self, voiture):
+    def __depart_libre(self, voiture: VoitureReseau) -> bool:
         x, y, _ = voiture.position()
         for autre in self.__agents:
             ax, ay, _ = autre.position()
@@ -428,7 +432,7 @@ class SimulationReseauOSM:
                 return False
         return True
 
-    def __apparition(self):
+    def __apparition(self) -> None:
         if len(self.__agents) >= 125:
             return
         chemin = self.__choisir_itineraire()
@@ -437,7 +441,7 @@ class SimulationReseauOSM:
             if self.__depart_libre(voiture):
                 self.__agents.append(voiture)
 
-    def creer_urgence(self, type_urgence, niveau_priorite, vehicules):
+    def creer_urgence(self, type_urgence: str, niveau_priorite: int, vehicules: list[VehiculeUrgence]) -> int:
         """Même méthode que l'ancien Simulation : panneau d'urgence inchangé."""
         numero = self.__prochain_id
         self.__prochain_id += 1
@@ -460,7 +464,7 @@ class SimulationReseauOSM:
         return numero
 
     # Partie principale : gestion des urgences
-    def __detour_pour_urgence(self, voiture, urgence, morceaux_urgence):
+    def __detour_pour_urgence(self, voiture: VoitureReseau, urgence: VoitureReseau, morceaux_urgence: set[tuple[str, str]]) -> bool:
         """Essaye de quitter la route d'une urgence au premier carrefour utile.
 
         Les sens uniques sont respectés : tous les choix proviennent du graphe.
@@ -520,7 +524,7 @@ class SimulationReseauOSM:
             return False
         return False
 
-    def __retour_possible(self, voiture):
+    def __retour_possible(self, voiture: VoitureReseau) -> bool:
         """Ne pas se rabattre lorsqu'un véhicule est déjà à côté."""
         x, y, angle = voiture.position()
 
@@ -540,7 +544,7 @@ class SimulationReseauOSM:
                 return False
         return True
 
-    def __pres_intersection(self, voiture, marge=28):
+    def __pres_intersection(self, voiture: VoitureReseau, marge: int = 28) -> bool:
         """Le véhicule est-il au niveau d'un carrefour proche ?"""
         chemin = voiture.get_chemin()
         indice = voiture.get_indice_segment()
@@ -553,7 +557,7 @@ class SimulationReseauOSM:
         return False
 
     # Partie principale : gestion des urgences
-    def __reagir_aux_urgences(self):
+    def __reagir_aux_urgences(self) -> None:
         """Laisser libre le trajet d'urgence sans revenir trop tôt sur la route.
 
         Une fois décalée, la voiture garde son état jusqu'au passage effectif
@@ -620,7 +624,7 @@ class SimulationReseauOSM:
                   and self.__retour_possible(voiture)):
                 voiture.ajuster_decalage(0.0)
 
-    def __priorites(self):
+    def __priorites(self) -> None:
         """Pour chaque carrefour, prioritaire le plus urgent à proximité."""
         self.__urgences_noeud.clear()
         for agent in self.__agents:
@@ -637,7 +641,7 @@ class SimulationReseauOSM:
                         self.__urgences_noeud[noeud] = agent
                     break
 
-    def __sortie_libre(self, voiture, indice):
+    def __sortie_libre(self, voiture: VoitureReseau, indice: int) -> bool:
         """Ne pas entrer dans un carrefour si sa sortie est encombrée."""
         centre = voiture.distance_noeud(indice)
         ancien = voiture.get_avancement()
@@ -681,7 +685,7 @@ class SimulationReseauOSM:
                 return False
         return True
 
-    def __devant_urgence(self, voiture, urgence, noeud, precedent):
+    def __devant_urgence(self, voiture: VoitureReseau, urgence: VoitureReseau, noeud: str, precedent: str) -> bool:
         """Autoriser la voiture devant l'ambulance à libérer son approche."""
         chemin = urgence.get_chemin()
         for i in range(1, len(chemin)):
@@ -694,7 +698,7 @@ class SimulationReseauOSM:
                     return 0 <= restant_voiture < restant_urgence
         return False
 
-    def __route_libre(self, voiture, cible):
+    def __route_libre(self, voiture: VoitureReseau, cible: float) -> bool:
         """Seulement le véhicule devant sur la même voie, pas le côté."""
         ancien = voiture.get_avancement()
         voiture.set_avancement(cible)
@@ -719,7 +723,7 @@ class SimulationReseauOSM:
         return True
 
     # Partie principale : traitement principal
-    def __controle_intersections(self, voiture, cible):
+    def __controle_intersections(self, voiture: VoitureReseau, cible: float) -> tuple[float, str | None]:
         """Retourne (position_possible, noeud_a_reserver)."""
         a_reserver = None
         for i in range(1, len(voiture.get_chemin()) - 1):
@@ -768,7 +772,7 @@ class SimulationReseauOSM:
         return cible, None
 
     # Partie principale : évolution du trafic
-    def avancer(self):
+    def avancer(self) -> None:
         self.__tick += 1
         self.__attente_de.clear()
 

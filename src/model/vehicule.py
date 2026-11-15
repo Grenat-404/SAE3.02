@@ -2,10 +2,13 @@
 Modèle des véhicules du carrefour prédéfini.
 Gère mouvement, clignotants, parking et écartement latéral.
 """
+from __future__ import annotations
+
 import random
+from src.model.place import Place
 
 class Vehicule:
-    def __init__(self, x, y, vitesse, direction, destination=None):
+    def __init__(self, x: float, y: float, vitesse: float, direction: str, destination: str | None = None) -> None:
         self.__x = x
         self.__y = y
         self.__vitesse = float(vitesse)
@@ -32,36 +35,36 @@ class Vehicule:
         else:
             self.__position_laterale_reference = x
 
-    def incrementer_blocage(self):
+    def incrementer_blocage(self) -> None:
         self.__ticks_bloque += 1
-    def reset_blocage(self):
+    def reset_blocage(self) -> None:
         self.__ticks_bloque = 0
-    def get_ticks_bloque(self):
+    def get_ticks_bloque(self) -> int:
         return self.__ticks_bloque
-    def get_couleur(self):
+    def get_couleur(self) -> str:
         return self.__couleur
-    def get_x(self):
+    def get_x(self) -> float:
         return self.__x
-    def get_y(self):
+    def get_y(self) -> float:
         return self.__y
-    def get_vitesse(self):
+    def get_vitesse(self) -> float:
         return self.__vitesse
-    def get_direction(self):
+    def get_direction(self) -> str:
         return self.__direction
-    def get_clignotant(self):
+    def get_clignotant(self) -> str | None:
         return self.__clignotant
 
-    def activer_clignotant(self, cote, duree=25):
+    def activer_clignotant(self, cote: str, duree: int = 25) -> None:
         self.__clignotant = cote
         self.__temps_clignotant = duree
 
-    def mettre_a_jour_clignotant(self):
+    def mettre_a_jour_clignotant(self) -> None:
         if self.__temps_clignotant > 0:
             self.__temps_clignotant -= 1
         else:
             self.__clignotant = None
 
-    def get_dimensions(self):
+    def get_dimensions(self) -> tuple[int, int]:
         if self.__direction == "droite" or self.__direction == "gauche":
             return 30, 20
         elif self.__direction == "bas" or self.__direction == "haut":
@@ -69,70 +72,70 @@ class Vehicule:
         else:
             return 30, 20
 
-    def get_largeur(self):
+    def get_largeur(self) -> int:
         l, h = self.get_dimensions()
         return l
 
-    def get_hauteur(self):
+    def get_hauteur(self) -> int:
         l, h = self.get_dimensions()
         return h
 
-    def get_destination(self):
+    def get_destination(self) -> str | None:
         return self.__destination
 
-    def get_etat(self):
+    def get_etat(self) -> str:
         return self.__etat
-    def set_etat(self, etat):
+    def set_etat(self, etat: str) -> None:
         self.__etat = etat
 
-    def get_trajet(self):
+    def get_trajet(self) -> list[tuple[float, float]]:
         return self.__trajet
-    def set_trajet(self, trajet):
+    def set_trajet(self, trajet: list[tuple[float, float]]) -> None:
         self.__trajet = trajet
 
-    def get_place(self):
+    def get_place(self) -> Place | None:
         return self.__place
-    def set_place(self, place):
+    def set_place(self, place: Place | None) -> None:
         self.__place = place
 
-    def get_timer(self):
+    def get_timer(self) -> int:
         return self.__timer
-    def set_timer(self, timer):
+    def set_timer(self, timer: int) -> None:
         self.__timer = timer
 
-    def get_veut_se_garer(self):
+    def get_veut_se_garer(self) -> bool:
         return self.__veut_se_garer
-    def set_veut_se_garer(self, valeur):
+    def set_veut_se_garer(self, valeur: bool) -> None:
         self.__veut_se_garer = valeur
 
-    def set_x(self, valeur):
+    def set_x(self, valeur: float) -> None:
         self.__x = valeur
 
-    def set_y(self, valeur):
+    def set_y(self, valeur: float) -> None:
         self.__y = valeur
 
-    def set_destination(self, destination):
+    def set_destination(self, destination: str | None) -> None:
         self.__destination = destination
 
-    def set_direction(self, nouvelle_direction):
+    def set_direction(self, nouvelle_direction: str) -> None:
         if nouvelle_direction != self.__direction:
             self.__decalage_lateral = 0
         self.__direction = nouvelle_direction
 
-    def commencer_ecartement_urgence(self):
+    def commencer_ecartement_urgence(self) -> None:
         self.__ecartement_urgence = True
 
-    def terminer_ecartement_urgence(self):
+    def terminer_ecartement_urgence(self) -> None:
         self.__ecartement_urgence = False
 
-    def est_en_ecartement_urgence(self):
+    def est_en_ecartement_urgence(self) -> bool:
         return self.__ecartement_urgence
 
-    def est_ecarte_urgence(self):
+    def est_ecarte_urgence(self) -> bool:
         return self.__ecartement_urgence or self.__decalage_lateral != 0
 
     # Partie principale : traitement principal
-    def mettre_a_jour_ecartement(self):
+    def mettre_a_jour_ecartement(self) -> None:
         ancien = self.__decalage_lateral
         if self.__ecartement_urgence:
             if self.__direction == "droite":
@@ -167,7 +170,7 @@ class Vehicule:
         elif self.__direction in ("bas", "haut"):
             self.__x += delta
 
-    def avancer(self, vitesse_calculee=None):
+    def avancer(self, vitesse_calculee: float | None = None) -> None:
         if vitesse_calculee is None:
             vitesse = self.__vitesse
         else:

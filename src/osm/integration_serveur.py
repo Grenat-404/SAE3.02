@@ -2,11 +2,15 @@
 Adaptateur serveur pour alterner simulation classique et cartes OSM.
 Conserve les sockets existants, pilote le moteur OSM côté serveur.
 """
+from __future__ import annotations
+
 import base64
 import json
 import re
 import threading
 import zlib
+from typing import Any, cast
+from src.reseau.protocole import VehiculeUrgence, EtatVehiculeOSM, MoteurSimulation
 from pathlib import Path
 
 from src.reseau import serveur as serveur_original
@@ -17,20 +21,20 @@ from src.osm.simulation_reseau_osm import SimulationReseauOSM
 class SimulationAvecOSM:
     """Aiguillage entre le carrefour d'origine et le moteur multicarrefours."""
 
-    def __init__(self, moteur, largeur, hauteur):
+    def __init__(self, moteur: MoteurSimulation, largeur: int, hauteur: int) -> None:
         self.__verrou = threading.RLock()
         self.__largeur = largeur
         self.__hauteur = hauteur
-        self.__moteur = moteur
-        self.__carte = None
-        self.__centre = None
+        self.__moteur: Any = moteur
+        self.__carte: str | None = None
+        self.__centre: str | None = None
         self.__selection = "classique"
-        self.__plan = None
-        self.__plan_zip = None
+        self.__plan: dict[str, Any] | None = None
+        self.__plan_zip: str | None = None
         self.__numero_image = 0
 
     # Partie principale : traitement principal
-    def changer_carte(self, carte, centre):
+    def changer_carte(self, carte: str | None, centre: str | None) -> None:
         """Charge une nouvelle simulation, sans détruire la précédente si échec."""
         with self.__verrou:
             if carte is None:
@@ -65,20 +69,20 @@ class SimulationAvecOSM:
                 ancien.arreter()
             print("[SERVEUR] Simulation :", selection, flush=True)
 
-    def reinitialiser(self):
+    def reinitialiser(self) -> None:
         with self.__verrou:
             self.changer_carte(self.__carte, self.__centre)
 
-    def avancer(self):
+    def avancer(self) -> None:
         with self.__verrou:
             self.__moteur.avancer()
 
-    def creer_urgence(self, type_urgence, niveau_priorite, vehicules):
+    def creer_urgence(self, type_urgence: str, niveau_priorite: int, vehicules: list[VehiculeUrgence]) -> int:
         with self.__verrou:
             return self.__moteur.creer_urgence(type_urgence, niveau_priorite, vehicules)
 
     # Partie principale : traitement principal
-    def exporter_etat_reseau(self):
+    def exporter_etat_reseau(self) -> dict[str, Any]:
         with self.__verrou:
             if self.__carte is None:
 
@@ -87,7 +91,7 @@ class SimulationAvecOSM:
                 return etat
 
             self.__numero_image += 1
-            vehicules = []
+            vehicules: list[EtatVehiculeOSM] = []
             for voiture in self.__moteur.get_vehicules():
                 x, y, angle = voiture.position()
                 vehicules.append({
@@ -100,7 +104,7 @@ class SimulationAvecOSM:
             feux = {
                 str(noeud) + "|" + str(precedent):
                     self.__moteur.get_etat_feu(noeud, precedent)
-                for noeud, precedent, _ in self.__plan["feux"]
+                for noeud, precedent, _ in cast(dict[str, Any], self.__plan)["feux"]
             }
             etat = {
                 "type": "etat",
@@ -114,7 +118,7 @@ class SimulationAvecOSM:
                 etat["plan_osm_zip"] = self.__plan_zip
             return etat
 
-    def arreter(self):
+    def arreter(self) -> None:
         with self.__verrou:
             if hasattr(self.__moteur, "arreter"):
                 self.__moteur.arreter()
@@ -123,7 +127,7 @@ class SimulationAvecOSM:
 class SessionClientAvecOSM(serveur_original.SessionClient):
     """Ajoute une commande au protocole sans réécrire la session TCP."""
 
-    def _SessionClient__traiter(self, message):
+    def _SessionClient__traiter(self, message: dict[str, Any]) -> None:
         if message.get("type") != "carte_osm":
             return super()._SessionClient__traiter(message)
 
@@ -132,7 +136,7 @@ class SessionClientAvecOSM(serveur_original.SessionClient):
             centre = message.get("carrefour")
             if carte is None and centre is not None:
                 raise ValueError("Un carrefour ne peut pas être choisi sans carte")
-            self._SessionClient__serveur.changer_carte_osm(carte, centre)
+            cast(ServeurAvecOSM, self._SessionClient__serveur).changer_carte_osm(carte, centre)
         except Exception as erreur:
 
             reponse = encoder({
@@ -147,25 +151,25 @@ class SessionClientAvecOSM(serveur_original.SessionClient):
 class ServeurAvecOSM(serveur_original.ServeurReseau):
     """Réutilise intégralement les sockets et les threads existants."""
 
-    def __init__(self):
+    def __init__(self) -> None:
 
         serveur_original.SessionClient = SessionClientAvecOSM
         super().__init__()
 
-    def initialiser_simulation(self, largeur, hauteur):
+    def initialiser_simulation(self, largeur: int, hauteur: int) -> None:
         super().initialiser_simulation(largeur, hauteur)
         with self._ServeurReseau__verrou_simulation:
             simulation = self._ServeurReseau__simulation
             if simulation is not None and not isinstance(simulation, SimulationAvecOSM):
                 self._ServeurReseau__simulation = SimulationAvecOSM(simulation, largeur, hauteur)
 
-    def changer_carte_osm(self, carte, carrefour):
+    def changer_carte_osm(self, carte: str | None, carrefour: str | None) -> None:
         simulation = self.simulation()
         if not isinstance(simulation, SimulationAvecOSM):
             raise ValueError("Simulation non initialisée")
         simulation.changer_carte(carte, carrefour)
 
-    def demander_reinitialisation(self):
+    def demander_reinitialisation(self) -> None:
         simulation = self.simulation()
         if isinstance(simulation, SimulationAvecOSM):
             simulation.reinitialiser()

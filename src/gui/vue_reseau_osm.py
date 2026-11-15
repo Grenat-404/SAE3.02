@@ -2,9 +2,14 @@
 Dessin des routes, des feux et des véhicules du mode OSM.
 Le moteur de circulation reste côté serveur.
 """
+from __future__ import annotations
+
 import math
 from PyQt6.QtCore import QPointF, QRectF, Qt
-from PyQt6.QtGui import QColor, QFont, QPen
+from PyQt6.QtGui import QColor, QFont, QPen, QPainter
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from src.osm.integration_client import SimulationDistanteAvecOSM
 
 COULEURS = {
     'green': '#00ee00', 'yellow': '#ffee00', 'cyan': '#00e3ec',
@@ -14,7 +19,7 @@ COULEURS = {
     'darkGreen': '#4a603c'}
 
 # Partie principale : affichage
-def dessiner_reseau_osm(painter, simulation, clignotant_tick):
+def dessiner_reseau_osm(painter: QPainter, simulation: SimulationDistanteAvecOSM, clignotant_tick: int) -> None:
     dessin = simulation.get_dessin()
     painter.setRenderHint(painter.RenderHint.Antialiasing)
     painter.fillRect(painter.viewport(), QColor('#286b30'))

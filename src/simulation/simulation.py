@@ -2,6 +2,8 @@
 Moteur historique du carrefour prédéfini.
 Feux, files, priorité aux urgences, piétons et stationnement.
 """
+from __future__ import annotations
+
 from src.model.route import Route
 from src.model.intersection import Intersection
 from src.model.feu import Feu
@@ -11,20 +13,36 @@ from src.model.parking import Parking
 import random
 import threading
 import time
+from typing import Any, TypedDict, cast
+from src.reseau.protocole import VehiculeUrgence
+
+class PassagePieton(TypedDict):
+    x: float
+    y: float
+    largeur: float
+    hauteur: float
+    axe: str
+
+
+class DemandePrioritaire(TypedDict):
+    vehicule: VehiculePrioritaire
+    priorite: int
+    ordre: int
+
 
 PERIODE_TICK = 0.03
 
 class ThreadVehicule(threading.Thread):
-    def __init__(self, simulation, vehicule):
+    def __init__(self, simulation: Simulation, vehicule: Vehicule) -> None:
         super().__init__(daemon=True)
         self.__simulation = simulation
         self.__vehicule = vehicule
         self.__actif = True
 
-    def arreter(self):
+    def arreter(self) -> None:
         self.__actif = False
 
-    def run(self):
+    def run(self) -> None:
         prochain = time.monotonic()
         while self.__actif:
             self.__simulation.mettre_a_jour_vehicule(self.__vehicule)
@@ -36,17 +54,17 @@ class ThreadVehicule(threading.Thread):
                 prochain = time.monotonic()
 
 class Simulation:
-    def __init__(self, largeur_ecran, hauteur_ecran):
+    def __init__(self, largeur_ecran: int, hauteur_ecran: int) -> None:
         self.__verrou = threading.RLock()
-        self.__threads = {}
-        self.__attente_virage = {}
-        self.__retenus_entree = set()
-        self.__vehicules = []
-        self.__routes = []
+        self.__threads: dict[Vehicule, ThreadVehicule] = {}
+        self.__attente_virage: dict[Vehicule, int] = {}
+        self.__retenus_entree: set[Vehicule] = set()
+        self.__vehicules: list[Vehicule] = []
+        self.__routes: list[Route] = []
         self.__prochain_id_urgence = 1
-        self.__demandes_prioritaires = []
-        self.__demande_prioritaire_active = None
-        self.__vehicules_prioritaires_connus = set()
+        self.__demandes_prioritaires: list[DemandePrioritaire] = []
+        self.__demande_prioritaire_active: DemandePrioritaire | None = None
+        self.__vehicules_prioritaires_connus: set[VehiculePrioritaire] = set()
         self.__ordre_arrivee_priorite = 0
         self.__etat_priorite = None
         self.__compteur_priorite = 0
@@ -54,12 +72,12 @@ class Simulation:
         self.__distance_detection_ecartement = 300
         self.__distance_liberation_ecartement = 80
         self.__duree_retour_priorite = 15
-        self.__vehicules_ecartes_ce_tick = set()
+        self.__vehicules_ecartes_ce_tick: set[Vehicule] = set()
         self.__duree_stop_sortie = 25
         self.__vitesse_sortie = 2.5
         self.__marge_sortie = 20
-        self.__attente_stop_sortie = {}
-        self.__sorties_engagees = set()
+        self.__attente_stop_sortie: dict[Vehicule, int] = {}
+        self.__sorties_engagees: set[Vehicule] = set()
         self.__cycle_state = "horizontal_vert"
         self.__time_remaining = 100
         largeur_route = 150
@@ -91,54 +109,54 @@ class Simulation:
         self.__largeur_ecran = largeur_ecran
         self.__hauteur_ecran = hauteur_ecran
 
-        self.__passages_pietons = {
+        self.__passages_pietons: dict[str, PassagePieton] = {
             "ouest": { "x": ix - 67, "y": iy, "largeur": 55, "hauteur": ih, "axe": "y" },
             "est": { "x": ix + il + 12, "y": iy, "largeur": 55, "hauteur": ih, "axe": "y" },
             "nord": { "x": ix, "y": iy - 67, "largeur": il, "hauteur": 55, "axe": "x" },
             "sud": { "x": ix, "y": iy + ih + 12, "largeur": il, "hauteur": 55, "axe": "x" }}
-        self.__pietons = {nom: [] for nom in self.__passages_pietons}
+        self.__pietons: dict[str, list[dict[str, Any]]] = {nom: [] for nom in self.__passages_pietons}
 
         for direction, destination in (("droite", None), ("gauche", "haut"), ("bas", None), ("haut", None)):
             pos = self.__spawn_pos[direction]
             self.__ajouter_vehicule(Vehicule(pos["x"], pos["y"], 4, direction, destination))
 
-    def __ajouter_vehicule(self, vehicule):
+    def __ajouter_vehicule(self, vehicule: Vehicule) -> None:
         with self.__verrou:
             self.__vehicules.append(vehicule)
             thread = ThreadVehicule(self, vehicule)
             self.__threads[vehicule] = thread
             thread.start()
 
-    def __arreter_thread(self, vehicule):
+    def __arreter_thread(self, vehicule: Vehicule) -> None:
         self.__attente_virage.pop(vehicule, None)
         self.__retenus_entree.discard(vehicule)
         thread = self.__threads.pop(vehicule, None)
         if thread is not None:
             thread.arreter()
 
-    def arreter(self):
+    def arreter(self) -> None:
         with self.__verrou:
             for thread in self.__threads.values():
                 thread.arreter()
             self.__threads.clear()
 
-    def get_routes(self):
+    def get_routes(self) -> list[Route]:
         return self.__routes
-    def get_feux(self):
+    def get_feux(self) -> list[Feu]:
         return self.__feux
-    def get_vehicules(self):
+    def get_vehicules(self) -> list[Vehicule]:
         with self.__verrou:
             return list(self.__vehicules)
-    def get_intersections(self):
+    def get_intersections(self) -> Intersection:
         return self.__intersection
-    def get_parking(self):
+    def get_parking(self) -> Parking:
         return self.__parking
 
-    def get_pietons(self):
+    def get_pietons(self) -> list[dict[str, Any]]:
         with self.__verrou:
             return [ dict(pieton) for groupe in self.__pietons.values() for pieton in groupe ]
 
-    def __passage_libre(self, passage):
+    def __passage_libre(self, passage: PassagePieton) -> bool:
         """Vérifie qu'aucune voiture n'est sur le passage."""
         x = passage["x"]
         y = passage["y"]
@@ -155,7 +173,7 @@ class Simulation:
                 return False
         return True
 
-    def __pieton_peut_partir(self, nom, passage):
+    def __pieton_peut_partir(self, nom: str, passage: PassagePieton) -> bool:
         """Le piéton traverse au rouge, hors urgence."""
         if self.__etat_priorite is not None:
             return False
@@ -166,7 +184,7 @@ class Simulation:
         return feux_rouges and self.__passage_libre(passage)
 
     # Partie principale : passages piétons
-    def __mettre_a_jour_pietons(self):
+    def __mettre_a_jour_pietons(self) -> None:
         maximum_pietons = 1
         frequence = 350
         vitesse = 3
@@ -205,13 +223,13 @@ class Simulation:
                 dimension = (passage["hauteur"] if axe == "y" else passage["largeur"])
 
                 if pieton["sens"] == 1:
-                    termine = (pieton[axe] >= passage[axe] + dimension + 8)
+                    termine = (pieton[axe] >= cast(dict[str, Any], passage)[axe] + dimension + 8)
                 else:
-                    termine = (pieton[axe] <= passage[axe] - 8)
+                    termine = (pieton[axe] <= cast(dict[str, Any], passage)[axe] - 8)
                 if termine:
                     groupe.remove(pieton)
 
-    def __vehicule_bloque_par_pieton(self, vehicule, vitesse):
+    def __vehicule_bloque_par_pieton(self, vehicule: Vehicule, vitesse: float) -> bool:
         if vitesse <= 0:
             return False
         direction = vehicule.get_direction()
@@ -247,7 +265,7 @@ class Simulation:
                     return True
         return False
 
-    def spawn_vehicles(self):
+    def spawn_vehicles(self) -> None:
         if random.randint(1, 30) == 1 and len(self.__vehicules) < 30:
             direction = random.choice(["droite", "gauche", "bas", "haut"])
             vitesse = 3
@@ -272,7 +290,7 @@ class Simulation:
             else:
                 self.__spawn_pos[direction]["y"] = y
 
-    def __secours_en_approche_hors_ecran(self, vehicule):
+    def __secours_en_approche_hors_ecran(self, vehicule: Vehicule) -> bool:
         if not isinstance(vehicule, VehiculePrioritaire):
             return False
         direction = vehicule.get_direction_initiale()
@@ -289,7 +307,7 @@ class Simulation:
             return y > self.__hauteur_ecran and 0 <= x <= self.__largeur_ecran
         return False
 
-    def despawn_vehicles(self):
+    def despawn_vehicles(self) -> None:
         vehicules_a_garder = []
         for vehicule in self.__vehicules:
             dans_ecran = (0 <= vehicule.get_x() <= self.__largeur_ecran
@@ -300,14 +318,14 @@ class Simulation:
                 self.__arreter_thread(vehicule)
         self.__vehicules = vehicules_a_garder
 
-    def __centre(self, v):
+    def __centre(self, v: Vehicule) -> tuple[float, float]:
         return v.get_x() + v.get_largeur() / 2, v.get_y() + v.get_hauteur() / 2
 
-    def __placer_centre(self, v, cx, cy):
+    def __placer_centre(self, v: Vehicule, cx: float, cy: float) -> None:
         v.set_x(cx - v.get_largeur() / 2)
         v.set_y(cy - v.get_hauteur() / 2)
 
-    def __bloque_devant(self, vehicule):
+    def __bloque_devant(self, vehicule: Vehicule) -> bool:
         cx, cy = self.__centre(vehicule)
         direction = vehicule.get_direction()
         for autre in self.__vehicules:
@@ -326,7 +344,7 @@ class Simulation:
                 return True
         return False
 
-    def __rect_balayage(self, v, ticks):
+    def __rect_balayage(self, v: Vehicule, ticks: float) -> tuple[float, float, float, float]:
         """Rectangle de v + la distance qu'il va parcourir dans `ticks` ticks."""
         cx, cy = self.__centre(v)
         lg = max(v.get_largeur(), v.get_hauteur())
@@ -353,7 +371,7 @@ class Simulation:
                 y0 -= avance
         return x0, y0, x1, y1
 
-    def est_manoeuvre_libre(self, vehicule, direction_cible):
+    def est_manoeuvre_libre(self, vehicule: Vehicule, direction_cible: str) -> bool:
         ix, iy = self.__intersection.get_x(), self.__intersection.get_y()
         il, ih = self.__intersection.get_largeur(), self.__intersection.get_hauteur()
         lg = max(vehicule.get_largeur(), vehicule.get_hauteur())
@@ -410,7 +428,7 @@ class Simulation:
             self.__attente_virage[vehicule] = attente + 1
         return libre
 
-    def __intersection_occupee_pour(self, vehicule):
+    def __intersection_occupee_pour(self, vehicule: Vehicule) -> bool:
         """True si le véhicule est à la ligne d'arrêt et qu'un véhicule de l'axe
         perpendiculaire est encore dans l'intersection."""
         if isinstance(vehicule, VehiculePrioritaire):
@@ -433,7 +451,7 @@ class Simulation:
                 return True
         return False
 
-    def __route_libre_sortie(self, vehicule):
+    def __route_libre_sortie(self, vehicule: Vehicule) -> bool:
         xs = self.__parking.get_sortie()[0]
         cy_sortant = self.__centre(vehicule)[1]
         ticks_traversee = abs(self.__y_route_gauche - cy_sortant) / self.__vitesse_sortie
@@ -451,14 +469,14 @@ class Simulation:
                 return False
         return True
 
-    def __autorisation_sortie(self, vehicule):
+    def __autorisation_sortie(self, vehicule: Vehicule) -> bool:
         attente = self.__attente_stop_sortie.get(vehicule, self.__duree_stop_sortie)
         if attente > 0:
             self.__attente_stop_sortie[vehicule] = attente - 1
             return False
         return self.__route_libre_sortie(vehicule)
 
-    def __entrer_parking(self, vehicule):
+    def __entrer_parking(self, vehicule: Vehicule) -> bool:
         xe = self.__parking.get_entree()[0]
         cx, cy = self.__centre(vehicule)
         if cx > xe:
@@ -478,7 +496,7 @@ class Simulation:
         vehicule.set_etat("entrant")
         return True
 
-    def __suivre_trajet(self, vehicule):
+    def __suivre_trajet(self, vehicule: Vehicule) -> None:
         trajet = vehicule.get_trajet()
         cx, cy = self.__centre(vehicule)
         cible_x, cible_y = trajet[0]
@@ -515,7 +533,7 @@ class Simulation:
             cy -= pas
         self.__placer_centre(vehicule, cx, cy)
 
-    def __gerer_parking(self, vehicule):
+    def __gerer_parking(self, vehicule: Vehicule) -> None:
         etat = vehicule.get_etat()
         if etat == "gare":
             vehicule.set_timer(vehicule.get_timer() - 1)
@@ -541,7 +559,7 @@ class Simulation:
             self.__attente_stop_sortie.pop(vehicule, None)
 
     # Partie principale : priorité et véhicules d'urgence
-    def creer_urgence(self, type_urgence, niveau_priorite, vehicules):
+    def creer_urgence(self, type_urgence: str, niveau_priorite: int, vehicules: list[VehiculeUrgence]) -> int:
         with self.__verrou:
             urgence_id = self.__prochain_id_urgence
             self.__prochain_id_urgence += 1
@@ -553,7 +571,7 @@ class Simulation:
                 nombre_par_direction[direction] = decalage + 1
             return urgence_id
 
-    def __ajouter_vehicule_prioritaire(self, type_service, direction, destination, niveau_priorite, type_urgence, urgence_id, decalage):
+    def __ajouter_vehicule_prioritaire(self, type_service: str, direction: str, destination: str | None, niveau_priorite: int, type_urgence: str, urgence_id: int, decalage: int) -> None:
         if direction not in self.__spawn_pos:
             return
         sens_x, sens_y = {"droite": (-1, 0), "gauche": (1, 0), "bas": (0, -1), "haut": (0, 1)}[direction]
@@ -571,7 +589,7 @@ class Simulation:
             y += sens_y * 65
         self.__ajouter_vehicule(VehiculePrioritaire(x, y, 4, direction, destination, type_service, niveau_priorite, type_urgence, urgence_id))
 
-    def __distance_avant_intersection(self, vehicule):
+    def __distance_avant_intersection(self, vehicule: Vehicule) -> float:
         ix = self.__intersection.get_x()
         iy = self.__intersection.get_y()
         il = self.__intersection.get_largeur()
@@ -586,10 +604,10 @@ class Simulation:
             return vehicule.get_y() - (iy + ih)
         return -1
 
-    def __vehicule_est_avant_intersection(self, vehicule):
+    def __vehicule_est_avant_intersection(self, vehicule: Vehicule) -> bool:
         return self.__distance_avant_intersection(vehicule) >= 0
 
-    def __detecter_demandes_prioritaires(self):
+    def __detecter_demandes_prioritaires(self) -> None:
         for vehicule in self.__vehicules:
             if not isinstance(vehicule, VehiculePrioritaire):
                 continue
@@ -613,7 +631,7 @@ class Simulation:
             self.__activer_prochaine_priorite()
         self.__reevaluer_priorite_active()
 
-    def __activer_prochaine_priorite(self):
+    def __activer_prochaine_priorite(self) -> None:
         if len(self.__demandes_prioritaires) == 0:
             return
         self.__demandes_prioritaires.sort(key=lambda demande: (-demande["priorite"], demande["ordre"]))
@@ -631,7 +649,7 @@ class Simulation:
         self.__etat_priorite = "passage"
         self.__appliquer_feu_prioritaire(direction)
 
-    def __reevaluer_priorite_active(self):
+    def __reevaluer_priorite_active(self) -> None:
         if self.__demande_prioritaire_active is None:
             return
         if len(self.__demandes_prioritaires) == 0:
@@ -650,7 +668,7 @@ class Simulation:
         self.__etat_priorite = None
         self.__activer_prochaine_priorite()
 
-    def __mettre_a_jour_priorite(self):
+    def __mettre_a_jour_priorite(self) -> None:
         if self.__demande_prioritaire_active is None:
             return
         vehicule = self.__demande_prioritaire_active["vehicule"]
@@ -669,7 +687,7 @@ class Simulation:
             if self.__compteur_priorite <= 0:
                 self.__terminer_priorite()
 
-    def __terminer_priorite(self):
+    def __terminer_priorite(self) -> None:
         if self.__demande_prioritaire_active is None:
             return
         direction_terminee = self.__demande_prioritaire_active["vehicule"].get_direction_initiale()
@@ -680,20 +698,20 @@ class Simulation:
             return
         self.__restaurer_cycle_normal(direction_terminee)
 
-    def __feu_de(self, direction):
+    def __feu_de(self, direction: str) -> Feu | None:
         return {"droite": self.__feu_droite, "gauche": self.__feu_gauche, "bas": self.__feu_bas, "haut": self.__feu_haut}.get(direction)
 
-    def __mettre_tous_feux_rouges(self):
+    def __mettre_tous_feux_rouges(self) -> None:
         for feu in self.__feux:
             feu.set_etat("rouge")
 
-    def __appliquer_feu_prioritaire(self, direction):
+    def __appliquer_feu_prioritaire(self, direction: str) -> None:
         self.__mettre_tous_feux_rouges()
         feu = self.__feu_de(direction)
         if feu is not None:
             feu.set_etat("vert")
 
-    def __meme_groupe_prioritaire(self, vehicule):
+    def __meme_groupe_prioritaire(self, vehicule: Vehicule) -> bool:
         if self.__demande_prioritaire_active is None:
             return False
         if not isinstance(vehicule, VehiculePrioritaire):
@@ -701,17 +719,17 @@ class Simulation:
         actif = self.__demande_prioritaire_active["vehicule"]
         return (vehicule.get_urgence_id() == actif.get_urgence_id() and vehicule.get_direction_initiale() == actif.get_direction_initiale())
 
-    def __est_prioritaire_actif(self, vehicule):
+    def __est_prioritaire_actif(self, vehicule: Vehicule) -> bool:
         if self.__etat_priorite != "passage":
             return False
         return self.__meme_groupe_prioritaire(vehicule)
 
-    def __direction_prioritaire_active(self):
+    def __direction_prioritaire_active(self) -> str | None:
         if self.__demande_prioritaire_active is None or self.__etat_priorite != "passage":
             return None
         return self.__demande_prioritaire_active["vehicule"].get_direction_initiale()
 
-    def __vehicule_prioritaire_a_passe(self, vehicule):
+    def __vehicule_prioritaire_a_passe(self, vehicule: Vehicule) -> bool:
         ix = self.__intersection.get_x()
         iy = self.__intersection.get_y()
         il = self.__intersection.get_largeur()
@@ -727,14 +745,14 @@ class Simulation:
             return vehicule.get_y() + vehicule.get_hauteur() < iy - marge
         return False
 
-    def __groupe_prioritaire_a_passe(self):
+    def __groupe_prioritaire_a_passe(self) -> bool:
         for vehicule in self.__vehicules:
             if self.__meme_groupe_prioritaire(vehicule):
                 if not self.__vehicule_prioritaire_a_passe(vehicule):
                     return False
         return True
 
-    def __restaurer_cycle_normal(self, direction):
+    def __restaurer_cycle_normal(self, direction: str) -> None:
         horizontal = direction in ("droite", "gauche")
         for feu in (self.__feu_droite, self.__feu_gauche):
             feu.set_etat("vert" if horizontal else "rouge")
@@ -743,7 +761,7 @@ class Simulation:
         self.__cycle_state = "horizontal_vert" if horizontal else "vertical_vert"
         self.__time_remaining = 100
 
-    def __mettre_a_jour_ecartement_urgence(self):
+    def __mettre_a_jour_ecartement_urgence(self) -> None:
         self.__vehicules_ecartes_ce_tick.clear()
         for vehicule in self.__vehicules:
             if isinstance(vehicule, VehiculePrioritaire):
@@ -759,7 +777,7 @@ class Simulation:
             if etait_ecarte or vehicule.est_ecarte_urgence():
                 self.__vehicules_ecartes_ce_tick.add(vehicule)
 
-    def __urgence_active_derriere(self, vehicule):
+    def __urgence_active_derriere(self, vehicule: Vehicule) -> bool:
         if self.__demande_prioritaire_active is None or self.__etat_priorite != "passage":
             return False
         direction = vehicule.get_direction()
@@ -792,14 +810,14 @@ class Simulation:
                 return True
         return False
 
-    def __vitesse_deplacement(self, vehicule):
+    def __vitesse_deplacement(self, vehicule: Vehicule) -> float:
         if isinstance(vehicule, VehiculePrioritaire):
             return vehicule.get_vitesse()
         if vehicule in self.__vehicules_ecartes_ce_tick:
             return 0
         return vehicule.get_vitesse()
 
-    def feux_sync(self):
+    def feux_sync(self) -> None:
         self.__time_remaining -= 1
         if self.__time_remaining <= 0:
             if self.__cycle_state == "horizontal_vert":
@@ -833,11 +851,11 @@ class Simulation:
                 self.__cycle_state = "horizontal_vert"
                 self.__time_remaining = 50
 
-    def __feu_bloque_direction(self, direction):
+    def __feu_bloque_direction(self, direction: str) -> bool:
         feu = self.__feu_de(direction)
         return True if feu is None else feu.get_etat() in ("rouge", "orange")
 
-    def __gerer_arret_feu(self, vehicule, vitesse):
+    def __gerer_arret_feu(self, vehicule: Vehicule, vitesse: float) -> bool:
         direction = vehicule.get_direction()
 
         ix = self.__intersection.get_x()
@@ -898,7 +916,7 @@ class Simulation:
 
         return False
 
-    def voie_libre(self, vehicule):
+    def voie_libre(self, vehicule: Vehicule) -> bool:
         seuil = 50
         for autre in self.__vehicules:
             if autre is vehicule:
@@ -937,7 +955,7 @@ class Simulation:
                             return False
         return True
 
-    def __voie_reservee_pendant_ecartement(self, vehicule, autre):
+    def __voie_reservee_pendant_ecartement(self, vehicule: Vehicule, autre: Vehicule) -> bool:
         if isinstance(vehicule, VehiculePrioritaire) or isinstance(autre, VehiculePrioritaire):
             return False
         if vehicule.get_direction() != autre.get_direction():
@@ -957,7 +975,7 @@ class Simulation:
             distance = -distance
         return lateral < 60 and 0 <= distance <= taille + 10 + vehicule.get_vitesse()
 
-    def __cote_clignotant(self, direction, destination):
+    def __cote_clignotant(self, direction: str, destination: str | None) -> str | None:
         directions = {
             "droite": {"haut": "gauche", "bas": "droite"},
             "gauche": {"bas": "gauche", "haut": "droite"},
@@ -966,7 +984,7 @@ class Simulation:
         }
         return directions.get(direction, {}).get(destination)
 
-    def __signaler_clignotants(self, vehicule):
+    def __signaler_clignotants(self, vehicule: Vehicule) -> None:
         if vehicule.get_destination() is not None:
             distance = self.__distance_avant_intersection(vehicule)
             if 0 <= distance <= 120:
@@ -977,7 +995,7 @@ class Simulation:
             if 0 <= self.__centre(vehicule)[0] - self.__parking.get_entree()[0] <= 100:
                 vehicule.activer_clignotant("droite")
 
-    def __gerer_direction(self, vehicule):
+    def __gerer_direction(self, vehicule: Vehicule) -> bool:
         doit_s_arreter = False
 
         if vehicule.get_direction() == "droite":
@@ -1078,7 +1096,7 @@ class Simulation:
 
         return doit_s_arreter
 
-    def __voiture_devant(self, vehicule):
+    def __voiture_devant(self, vehicule: Vehicule) -> bool:
         direction = vehicule.get_direction()
         for autre in self.__vehicules:
             if autre is vehicule:
@@ -1099,7 +1117,7 @@ class Simulation:
                 return True
         return False
 
-    def mettre_a_jour_vehicule(self, vehicule):
+    def mettre_a_jour_vehicule(self, vehicule: Vehicule) -> None:
         with self.__verrou:
             if vehicule not in self.__vehicules:
                 return
@@ -1129,7 +1147,7 @@ class Simulation:
                 vehicule.avancer(vitesse)
 
     # Partie principale : communication ou simulation
-    def avancer(self):
+    def avancer(self) -> None:
         with self.__verrou:
             self.__detecter_demandes_prioritaires()
             if self.__etat_priorite is None:
@@ -1141,7 +1159,7 @@ class Simulation:
             self.spawn_vehicles()
             self.despawn_vehicles()
 
-    def exporter_etat_reseau(self):
+    def exporter_etat_reseau(self) -> dict[str, Any]:
         """Instantané cohérent pour le réseau (protégé par le verrou d'origine)."""
         from src.reseau.etat import construire_etat
         with self.__verrou:

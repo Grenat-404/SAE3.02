@@ -2,49 +2,53 @@
 Adaptateur qui affiche les états OSM reçus par TCP.
 Conserve la fenêtre d'urgence et le carrefour prédéfini.
 """
+from __future__ import annotations
+
 import base64
 import json
 import socket
 import zlib
+from typing import Any
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QPainter
+from PyQt6.QtGui import QColor, QPainter, QPaintEvent
 from PyQt6.QtWidgets import QMessageBox
 
 from src.gui.interface import Interface
 from src.gui.selecteur_osm import SelecteurOSM
 from src.gui.vue_reseau_osm import dessiner_reseau_osm
 from src.reseau.proxy import SimulationDistante
+from src.reseau.protocole import EtatVehiculeOSM
 
 class VehiculeDistantOSM:
     """Même interface de dessin que VoitureReseau, avec des données JSON."""
 
-    def __init__(self, donnees):
+    def __init__(self, donnees: EtatVehiculeOSM) -> None:
         self.__donnees = donnees
 
-    def position(self):
+    def position(self) -> tuple[float, float, float]:
         return (self.__donnees["x"], self.__donnees["y"], self.__donnees["angle"])
 
-    def get_service(self):
+    def get_service(self) -> str:
         return self.__donnees["service"]
 
-    def get_couleur(self):
+    def get_couleur(self) -> str:
         return self.__donnees["couleur"]
 
-    def get_clignotant(self):
+    def get_clignotant(self) -> str:
         return self.__donnees["clignotant"]
 
-    def est_prioritaire(self):
+    def est_prioritaire(self) -> bool:
         return self.__donnees["prioritaire"]
 
 
 class SimulationDistanteAvecOSM(SimulationDistante):
-    def __init__(self, largeur, hauteur):
-        self.__selection = None
-        self.__dessin = None
+    def __init__(self, largeur: int, hauteur: int) -> None:
+        self.__selection: str | None = None
+        self.__dessin: dict[str, Any] | None = None
         super().__init__(largeur, hauteur)
 
-    def arreter(self):
+    def arreter(self) -> None:
         """Fermer sans erreur si le thread réseau se déconnecte en parallèle."""
         reseau = self._SimulationDistante__reseau
         reseau._ClientReseau__actif.clear()
@@ -61,7 +65,7 @@ class SimulationDistanteAvecOSM(SimulationDistante):
             except OSError:
                 pass
 
-    def avancer(self):
+    def avancer(self) -> None:
         super().avancer()
         etat = self._SimulationDistante__etat_affiche
         if etat.get("mode") != "osm":
@@ -78,26 +82,26 @@ class SimulationDistanteAvecOSM(SimulationDistante):
             except (ValueError, zlib.error, UnicodeDecodeError):
                 pass
 
-    def get_mode(self):
+    def get_mode(self) -> str:
         return self._SimulationDistante__etat_affiche.get("mode", "classique")
 
-    def get_dessin(self):
+    def get_dessin(self) -> dict[str, Any]:
         return self.__dessin or {
             "segments": [], "intersections": {}, "feux": [],
             "limite_droite": 1, "hauteur": 1,
         }
 
-    def get_vehicules(self):
+    def get_vehicules(self) -> list[Any]:
         if self.get_mode() == "osm":
             return [ VehiculeDistantOSM(d) for d in self._SimulationDistante__etat_affiche.get("agents_osm", []) ]
         return super().get_vehicules()
 
-    def get_etat_feu(self, noeud, precedent):
+    def get_etat_feu(self, noeud: str, precedent: str) -> str:
         cle = str(noeud) + "|" + str(precedent)
         return self._SimulationDistante__etat_affiche.get("feux_osm", {}).get(cle, "rouge")
 
     # Partie principale : traitement principal
-    def choisir_carte(self, carrefour):
+    def choisir_carte(self, carrefour: dict[str, Any] | None) -> None:
         reseau = self._SimulationDistante__reseau
         if not reseau.connecte():
             raise ConnectionError("Serveur non connecté : réessayer après connexion")
@@ -115,21 +119,22 @@ class SimulationDistanteAvecOSM(SimulationDistante):
 
 
 class InterfaceAvecOSM(Interface):
-    def __init__(self, simulation):
+    def __init__(self, simulation: SimulationDistanteAvecOSM) -> None:
         super().__init__(simulation)
+        self.simulation: SimulationDistanteAvecOSM = simulation
         self.__selecteur = SelecteurOSM(self)
         self.__selecteur.move(12, 12)
         self.__selecteur.carrefour_charge.connect(self.__charger_carte)
         self.__selecteur.show()
         self.__selecteur.raise_()
 
-    def __charger_carte(self, carrefour):
+    def __charger_carte(self, carrefour: dict[str, Any] | None) -> None:
         try:
             self.simulation.choisir_carte(carrefour)
         except (ConnectionError, KeyError, ValueError) as erreur:
             QMessageBox.warning(self, "Carte OSM", str(erreur))
 
-    def _Interface__dessiner_vehicule(self, painter, vehicule):
+    def _Interface__dessiner_vehicule(self, painter: QPainter, vehicule: Any) -> None:
         """Dessine les gyrophares du carrefour prédéfini, sans modifier l'interface originale."""
         super()._Interface__dessiner_vehicule(painter, vehicule)
 
@@ -160,7 +165,7 @@ class InterfaceAvecOSM(Interface):
         painter.drawRect(x_rouge, y_rouge, taille, taille)
 
     # Partie principale : traitement principal
-    def paintEvent(self, event):
+    def paintEvent(self, event: QPaintEvent) -> None:
         if self.simulation.get_mode() != "osm":
             return super().paintEvent(event)
         painter = QPainter(self)

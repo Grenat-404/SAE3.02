@@ -2,9 +2,12 @@
 Lecture hors-ligne du graphe routier OpenStreetMap.
 Gère les sens uniques, sélection des carrefours et recherche Dijkstra.
 """
+from __future__ import annotations
+
 import heapq
 import math
 import random
+from typing import TypedDict, cast
 from collections import defaultdict
 from xml.etree import ElementTree as ET
 
@@ -17,24 +20,38 @@ ROUTES = {
 TERRE = 6371000
 
 
+class CarrefourOSM(TypedDict):
+    id: str
+    nom: str
+    latitude: float
+    longitude: float
+
+
+class CandidatCarrefour(CarrefourOSM):
+    nb_rues: int
+    nb_branches: int
+    feu: bool
+
+
+
 class ReseauRoutier:
-    def __init__(self, fichier):
-        self.__noeuds = {}
-        self.__graphe = defaultdict(list)
-        self.__segments = []
-        self.__voisins = defaultdict(set)
-        self.__feux_osm = set()
-        self.__rues = defaultdict(set)
+    def __init__(self, fichier: str) -> None:
+        self.__noeuds: dict[str, tuple[float, float]] = {}
+        self.__graphe: defaultdict[str, list[tuple[str, float]]] = defaultdict(list)
+        self.__segments: list[tuple[str, str]] = []
+        self.__voisins: defaultdict[str, set[str]] = defaultdict(set)
+        self.__feux_osm: set[str] = set()
+        self.__rues: defaultdict[str, set[str]] = defaultdict(set)
         self.__lire(fichier)
 
     # Partie principale : traitement principal
-    def __lire(self, fichier):
+    def __lire(self, fichier: str) -> None:
         racine = ET.parse(fichier).getroot()
         if racine.tag != 'osm':
             raise ValueError('Le fichier doit être un .osm XML.')
 
         for element in racine.findall('node'):
-            identifiant = element.get('id')
+            identifiant = cast(str, element.get('id'))
             self.__noeuds[identifiant] = (float(element.get('lat')), float(element.get('lon')))
             tags = {t.get('k'): t.get('v') for t in element.findall('tag')}
             if tags.get('highway') == 'traffic_signals':
@@ -56,7 +73,7 @@ class ReseauRoutier:
             retour = sens not in ('yes', 'true', '1')
             if tags.get('highway') in ('motorway', 'motorway_link') and sens == 'no':
                 retour = False
-            ids = [n.get('ref') for n in way.findall('nd')]
+            ids = [cast(str, n.get('ref')) for n in way.findall('nd')]
             for a, b in zip(ids, ids[1:]):
                 if a not in self.__noeuds or b not in self.__noeuds or a == b:
                     continue
@@ -78,26 +95,26 @@ class ReseauRoutier:
         if not self.__segments:
             raise ValueError('Aucune route utilisable dans ce fichier OSM.')
 
-    def get_noeuds(self):
+    def get_noeuds(self) -> dict[str, tuple[float, float]]:
         return self.__noeuds
 
-    def get_graphe(self):
+    def get_graphe(self) -> dict[str, list[tuple[str, float]]]:
         return self.__graphe
 
-    def get_segments(self):
+    def get_segments(self) -> list[tuple[str, str]]:
         return self.__segments
 
-    def get_intersections(self):
+    def get_intersections(self) -> set[str]:
         return {n for n, voisins in self.__voisins.items() if len(voisins) >= 3}
 
-    def carrefours(self):
+    def carrefours(self) -> list[CarrefourOSM]:
         """Centres proposés dans le menu, sans les intersections trop proches.
 
         Le réseau de circulation garde tous ses noeuds et ses carrefours.
         Seule la liste des choix est simplifiée.
         """
         distance_minimale = 75
-        candidats = []
+        candidats: list[CandidatCarrefour] = []
         for identifiant in self.get_intersections():
             noms = sorted(self.__rues[identifiant])
             nom = ' × '.join(noms[:3]) if noms else f'Carrefour #{identifiant}'
@@ -112,7 +129,7 @@ class ReseauRoutier:
 
         candidats.sort(key=lambda c: (-c['nb_rues'], -int(c['feu']), -c['nb_branches'], c['nom'], c['id']))
 
-        retenus = []
+        retenus: list[CarrefourOSM] = []
         for candidat in candidats:
             if all(self.distance_metres(candidat['id'], autre['id']) >= distance_minimale for autre in retenus):
 
@@ -124,17 +141,17 @@ class ReseauRoutier:
 
         return sorted(retenus, key=lambda c: (c['nom'], c['id']))
 
-    def a_feu_osm(self, noeud):
+    def a_feu_osm(self, noeud: str) -> bool:
         return noeud in self.__feux_osm
 
-    def distance_metres(self, a, b):
+    def distance_metres(self, a: str, b: str) -> float:
         lat1, lon1 = self.__noeuds[a]
         lat2, lon2 = self.__noeuds[b]
         dy = math.radians(lat2 - lat1) * TERRE
         dx = math.radians(lon2 - lon1) * TERRE * math.cos(math.radians(lat1))
         return math.hypot(dx, dy)
 
-    def projeter(self, origine, largeur, hauteur):
+    def projeter(self, origine: str, largeur: int, hauteur: int) -> tuple[dict[str, tuple[float, float]], float]:
         """Coordonnées en pixels des nœuds autour du centre choisi."""
         lat0, lon0 = self.__noeuds[origine]
 
@@ -150,7 +167,7 @@ class ReseauRoutier:
         return positions, largeur_utile + 25
 
     # Partie principale : calcul des itinéraires
-    def dijkstra(self, depart, arrivee, hasard=None):
+    def dijkstra(self, depart: str, arrivee: str, hasard: dict[tuple[str, str], float] | None = None) -> list[str] | None:
         """Plus court chemin ; un léger hasard crée plusieurs itinéraires.
 
         Le hasard change le coût positif des routes ; les sens uniques restent
@@ -178,7 +195,7 @@ class ReseauRoutier:
                     heapq.heappush(file, (nouveau, suivant))
         return None
 
-    def itineraire_aleatoire(self, depart, arrivee, generateur):
+    def itineraire_aleatoire(self, depart: str, arrivee: str, generateur: random.Random) -> list[str] | None:
         """Trajet passant éventuellement par un nœud intermédiaire."""
         noeuds = list(self.__graphe)
         facteurs = {}

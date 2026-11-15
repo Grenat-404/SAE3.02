@@ -2,17 +2,21 @@
 Client TCP avec découverte automatique du serveur sur le réseau local.
 Reçoit les états de simulation et envoie les commandes d'urgence.
 """
+from __future__ import annotations
+
 import queue
 import select
 import socket
 import threading
 import time
+from typing import Any, Callable
+from src.reseau.protocole import VehiculeUrgence
 
 from src.reseau.protocole import (PORT_TCP, PORT_UDP, SIGNATURE, GROUPE_MULTICAST,
                                   TAILLE_MAXIMALE, encoder, decoder)
 
 class ClientReseau(threading.Thread):
-    def __init__(self, largeur, hauteur, recevoir_etat, recevoir_reponse, port_tcp=PORT_TCP, port_udp=PORT_UDP):
+    def __init__(self, largeur: int, hauteur: int, recevoir_etat: Callable[[dict[str, Any]], None], recevoir_reponse: Callable[[dict[str, Any]], None], port_tcp: int = PORT_TCP, port_udp: int = PORT_UDP) -> None:
         super().__init__(daemon=True)
         self.__largeur = largeur
         self.__hauteur = hauteur
@@ -23,16 +27,16 @@ class ClientReseau(threading.Thread):
         self.__actif = threading.Event()
         self.__actif.set()
         self.__connecte = threading.Event()
-        self.__a_envoyer = queue.Queue()
+        self.__a_envoyer: queue.Queue[dict[str, Any]] = queue.Queue()
         self.__socket = None
         self.__numero = 0
         self.__verrou = threading.Lock()
 
-    def connecte(self):
+    def connecte(self) -> bool:
         return self.__connecte.is_set()
 
     # Partie principale : communication ou simulation
-    def arreter(self):
+    def arreter(self) -> None:
         self.__actif.clear()
         self.__connecte.clear()
         if self.__socket is not None:
@@ -42,7 +46,7 @@ class ClientReseau(threading.Thread):
                 pass
             self.__socket.close()
 
-    def envoyer_urgence(self, type_urgence, niveau_priorite, vehicules):
+    def envoyer_urgence(self, type_urgence: str, niveau_priorite: int, vehicules: list[VehiculeUrgence]) -> int:
         if not self.connecte():
             raise ConnectionError("Serveur non connecté : demande non envoyée")
         with self.__verrou:
@@ -54,12 +58,12 @@ class ClientReseau(threading.Thread):
                                "vehicules": [dict(v) for v in vehicules]})
         return numero
 
-    def envoyer_reinitialisation(self):
+    def envoyer_reinitialisation(self) -> None:
         if not self.connecte():
             raise ConnectionError("Serveur non connecté")
         self.__a_envoyer.put({"type": "reinitialiser"})
 
-    def __decouvrir(self):
+    def __decouvrir(self) -> tuple[str, int] | None:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp:
             udp.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             udp.bind(("0.0.0.0", 0))
@@ -85,7 +89,7 @@ class ClientReseau(threading.Thread):
                     pass
         return None
 
-    def __session(self, adresse):
+    def __session(self, adresse: tuple[str, int]) -> None:
         tcp = socket.create_connection(adresse, timeout=3)
         self.__socket = tcp
         tcp.setblocking(False)
@@ -139,7 +143,7 @@ class ClientReseau(threading.Thread):
                 print("[CLIENT] Déconnecté, recherche automatique...", flush=True)
 
     # Partie principale : communication ou simulation
-    def run(self):
+    def run(self) -> None:
         while self.__actif.is_set():
             try:
                 adresse = self.__decouvrir()

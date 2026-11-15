@@ -2,15 +2,20 @@
 Panneau Qt pour préparer, envoyer et suivre les véhicules d'urgence.
 Formulaire partagé par la simulation prédéfinie et les cartes OSM.
 """
+from __future__ import annotations
+
+from typing import cast
+from src.reseau.proxy import SimulationDistante
+from src.reseau.protocole import VehiculeUrgence
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QWidget,QVBoxLayout,QHBoxLayout,QLabel,QComboBox,QSpinBox,QPushButton,QListWidget,QFrame
 
 class FenetreUrgence(QWidget):
 
-    def __init__(self, simulation, parent=None):
+    def __init__(self, simulation: SimulationDistante, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.__simulation = simulation
-        self.__vehicules_en_attente = []
+        self.__vehicules_en_attente: list[VehiculeUrgence] = []
         self.__panneau_reduit = False
         self.__largeur_ouverte = 250
         self.__largeur_reduite = 55
@@ -87,7 +92,7 @@ class FenetreUrgence(QWidget):
             self.__simulation.reponse_urgence.connect(self.__label_message.setText)
 
     # Partie principale : gestion de l'interface
-    def __creer_interface(self):
+    def __creer_interface(self) -> None:
         layout_principal = QVBoxLayout(self)
         layout_principal.setAlignment(Qt.AlignmentFlag.AlignTop)
         layout_principal.setContentsMargins(8, 8, 8, 8)
@@ -184,7 +189,7 @@ class FenetreUrgence(QWidget):
         self.__label_message.setWordWrap(True)
         layout.addWidget(self.__label_message)
 
-    def __basculer_panneau(self):
+    def __basculer_panneau(self) -> None:
         if self.__panneau_reduit:
             self.__contenu.show()
             self.setFixedWidth(self.__largeur_ouverte)
@@ -199,14 +204,14 @@ class FenetreUrgence(QWidget):
             self.__bouton_reduire.setToolTip("Ouvrir le panneau")
             self.__panneau_reduit = True
 
-        parent = self.parent()
+        parent = cast(QWidget | None, self.parent())
         if parent is not None:
             self.setGeometry(parent.width() - self.width(), 0, self.width(), parent.height())
 
         self.updateGeometry()
         self.update()
 
-    def __ajouter_vehicule(self):
+    def __ajouter_vehicule(self) -> None:
         service = self.__combo_service.currentData()
         nom_service = self.__combo_service.currentText()
         direction = self.__combo_provenance.currentData()
@@ -221,7 +226,7 @@ class FenetreUrgence(QWidget):
         }
 
         destination = destinations[direction][choix_destination]
-        configuration = {"service": service, "direction": direction, "destination": destination,
+        configuration: VehiculeUrgence = {"service": service, "direction": direction, "destination": destination,
                          "provenance": provenance}
 
         self.__vehicules_en_attente.append(configuration)
@@ -229,7 +234,7 @@ class FenetreUrgence(QWidget):
             f"{nom_service} - vient de {provenance} - {self.__combo_destination.currentText()}")
         self.__label_message.setText("Véhicule ajouté.")
 
-    def __retirer_vehicule(self):
+    def __retirer_vehicule(self) -> None:
         ligne = (self.__liste_vehicules.currentRow())
 
         if ligne < 0:
@@ -241,7 +246,7 @@ class FenetreUrgence(QWidget):
         self.__label_message.setText("Véhicule retiré.")
 
     # Partie principale : envoi au serveur
-    def __declencher_urgence(self):
+    def __declencher_urgence(self) -> None:
         if len(self.__vehicules_en_attente) == 0:
             self.__label_message.setText("Ajoute au moins un véhicule.")
             return
@@ -272,7 +277,7 @@ class FenetreUrgence(QWidget):
         self.__vehicules_en_attente.clear()
         self.__liste_vehicules.clear()
 
-    def __reinitialiser_simulation(self):
+    def __reinitialiser_simulation(self) -> None:
         try:
             self.__simulation.reinitialiser()
         except ConnectionError as erreur:

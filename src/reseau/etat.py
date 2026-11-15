@@ -2,9 +2,21 @@
 Conversion des objets du carrefour prédéfini en messages JSON.
 Transmission des véhicules, feux, piétons et parking au client.
 """
-from src.model.vehicule_prioritaire import VehiculePrioritaire
+from __future__ import annotations
 
-def rectangle(objet):
+from src.model.vehicule_prioritaire import VehiculePrioritaire
+from typing import Any, Protocol, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.simulation.simulation import Simulation
+
+class ObjetRectangulaire(Protocol):
+    def get_x(self) -> float: ...
+    def get_y(self) -> float: ...
+    def get_largeur(self) -> int: ...
+    def get_hauteur(self) -> int: ...
+
+def rectangle(objet: ObjetRectangulaire) -> dict[str, float]:
     return {
         "x": objet.get_x(),
         "y": objet.get_y(),
@@ -12,7 +24,7 @@ def rectangle(objet):
         "hauteur": objet.get_hauteur(),}
 
 # Partie principale : export JSON
-def construire_etat(simulation):
+def construire_etat(simulation: Simulation) -> dict[str, Any]:
     parking = simulation.get_parking()
     intersection = simulation.get_intersections()
     vehicules = []

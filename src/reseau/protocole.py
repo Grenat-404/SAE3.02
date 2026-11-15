@@ -2,7 +2,10 @@
 Constantes et validation du protocole TCP/UDP du projet.
 Sérialise les messages JSON et vérifie les urgences.
 """
+from __future__ import annotations
+
 import json
+from typing import Any, Protocol, TypedDict
 
 PORT_TCP = 5050
 PORT_UDP = 5051
@@ -10,11 +13,35 @@ SIGNATURE = "SAE302-HORREUR-V2I-1"
 GROUPE_MULTICAST = "239.255.30.2"
 TAILLE_MAXIMALE = 1_000_000
 
+class VehiculeUrgence(TypedDict):
+    service: str
+    direction: str
+    destination: str | None
+    provenance: str
 
-def encoder(message):
+
+class EtatVehiculeOSM(TypedDict):
+    x: float
+    y: float
+    angle: float
+    couleur: str
+    service: str
+    clignotant: str
+    prioritaire: bool
+
+
+class MoteurSimulation(Protocol):
+    def avancer(self) -> None: ...
+    def arreter(self) -> None: ...
+    def exporter_etat_reseau(self) -> dict[str, Any]: ...
+    def creer_urgence(self, type_urgence: str, niveau_priorite: int, vehicules: list[VehiculeUrgence]) -> int: ...
+
+
+
+def encoder(message: dict[str, Any]) -> bytes:
     return (json.dumps(message, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
 
-def decoder(ligne):
+def decoder(ligne: bytes) -> dict[str, Any]:
     if len(ligne) > TAILLE_MAXIMALE:
         raise ValueError("Trame réseau trop longue")
     message = json.loads(ligne.decode("utf-8"))
@@ -23,7 +50,7 @@ def decoder(ligne):
     return message
 
 # Partie principale : priorité et véhicules d'urgence
-def verifier_urgence(message):
+def verifier_urgence(message: dict[str, Any]) -> tuple[str, int, list[VehiculeUrgence]]:
     """Valider les valeurs AVANT l'appel au moteur original."""
     urgence = message.get("type_urgence")
     priorite = message.get("niveau_priorite")
@@ -39,7 +66,7 @@ def verifier_urgence(message):
         "gauche": {None, "bas", "haut"},
         "bas": {None, "droite", "gauche"},
         "haut": {None, "gauche", "droite"},}
-    nouveaux = []
+    nouveaux: list[VehiculeUrgence] = []
     for vehicule in vehicules:
         if not isinstance(vehicule, dict):
             raise ValueError("Configuration de véhicule invalide")

@@ -1,4 +1,6 @@
-# ---------------------------------------------------------------------------
+# 
+from __future__ import annotations
+---------------------------------------------------------------------------
 # SAÉ 3.02 | lancer_osm.py
 # Point d'entrée unique pour lancer la VM serveur ou la VM client.
 # Conserve la découverte du serveur et le choix entre carrefour classique et OSM.
@@ -7,7 +9,7 @@ import argparse
 import sys
 
 # Partie principale : démarrage des deux rôles
-def main():
+def main() -> int:
     analyseur = argparse.ArgumentParser(description="SAE3.02 - Client/serveur avec OSM")
     analyseur.add_argument("--role", required=True, choices=("serveur", "client"))
     role = analyseur.parse_args().role

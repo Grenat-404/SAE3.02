@@ -2,13 +2,17 @@
 Dessin Qt du carrefour prédéfini, du parking et des piétons.
 Ne calcule pas le trafic : les états proviennent du serveur.
 """
+from __future__ import annotations
+
+from typing import Any
 from PyQt6.QtWidgets import QWidget
-from PyQt6.QtGui import QPainter, QPen, QColor, QFont
+from src.reseau.proxy import SimulationDistante, ObjetDistant
+from PyQt6.QtGui import QPainter, QPen, QColor, QFont, QKeyEvent, QPaintEvent, QResizeEvent
 from PyQt6.QtCore import QTimer, Qt
 from src.gui.fenetre_urgence import FenetreUrgence
 
 class Interface(QWidget):
-    def __init__(self, simulation):
+    def __init__(self, simulation: SimulationDistante) -> None:
         super().__init__()
 
         self.simulation = simulation
@@ -24,17 +28,17 @@ class Interface(QWidget):
         self.timer.start(30)
         self.__compteur_clignotant = 0
 
-    def mettre_a_jour(self):
+    def mettre_a_jour(self) -> None:
         self.simulation.avancer()
         self.__compteur_clignotant = (self.__compteur_clignotant + 1) % 20
         self.update()
 
-    def keyPressEvent(self, event):
+    def keyPressEvent(self, event: QKeyEvent) -> None:
         if event.key() == Qt.Key.Key_Escape:
             self.close()
 
     # Partie principale : affichage
-    def __dessiner_vehicule(self, painter, vehicule):
+    def __dessiner_vehicule(self, painter: QPainter, vehicule: Any) -> None:
         x = int(vehicule.get_x())
         y = int(vehicule.get_y())
         largeur = int(vehicule.get_largeur())
@@ -103,7 +107,7 @@ class Interface(QWidget):
 
         painter.setPen(Qt.PenStyle.NoPen)
 
-    def __dessiner_char(self, painter, vehicule):
+    def __dessiner_char(self, painter: QPainter, vehicule: Any) -> None:
         largeur = int(vehicule.get_largeur())
         hauteur = int(vehicule.get_hauteur())
         x = int(vehicule.get_x())
@@ -147,7 +151,7 @@ class Interface(QWidget):
 
         painter.setPen(Qt.PenStyle.NoPen)
 
-    def __dessiner_passages_pietons(self, painter, intersection):
+    def __dessiner_passages_pietons(self, painter: QPainter, intersection: ObjetDistant) -> None:
         x = int(intersection.get_x())
         y = int(intersection.get_y())
         largeur = int(intersection.get_largeur())
@@ -182,7 +186,7 @@ class Interface(QWidget):
             for py in (y_nord, y_sud):
                 painter.drawRect(x + decalage, py, largeur_bande, longueur)
 
-    def __dessiner_pietons(self, painter):
+    def __dessiner_pietons(self, painter: QPainter) -> None:
         for pieton in self.simulation.get_pietons():
             x = int(pieton["x"])
             y = int(pieton["y"])
@@ -197,7 +201,7 @@ class Interface(QWidget):
         painter.setPen(Qt.PenStyle.NoPen)
 
     # Partie principale : gestion de l'interface
-    def paintEvent(self, event):
+    def paintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self)
         painter.fillRect(self.rect(), QColor(70, 120, 60))
         painter.setPen(Qt.PenStyle.NoPen)
@@ -335,7 +339,7 @@ class Interface(QWidget):
                 self.__dessiner_vehicule(painter, vehicule)
         self.__dessiner_pietons(painter)
 
-    def resizeEvent(self, event):
+    def resizeEvent(self, event: QResizeEvent) -> None:
         largeur_panneau = self.__panneau_urgence.width()
         self.__panneau_urgence.setGeometry(self.width() - largeur_panneau, 0, largeur_panneau, self.height())
         super().resizeEvent(event)
