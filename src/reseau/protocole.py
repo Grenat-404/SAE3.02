@@ -14,6 +14,7 @@ GROUPE_MULTICAST = "239.255.30.2"
 TAILLE_MAXIMALE = 1_000_000
 
 class VehiculeUrgence(TypedDict):
+    """Représente VehiculeUrgence dans l'application."""
     service: str
     direction: str
     destination: str | None
@@ -21,6 +22,7 @@ class VehiculeUrgence(TypedDict):
 
 
 class EtatVehiculeOSM(TypedDict):
+    """Représente EtatVehiculeOSM dans l'application."""
     x: float
     y: float
     angle: float
@@ -31,6 +33,7 @@ class EtatVehiculeOSM(TypedDict):
 
 
 class MoteurSimulation(Protocol):
+    """Représente MoteurSimulation dans l'application."""
     def avancer(self) -> None: ...
     def arreter(self) -> None: ...
     def exporter_etat_reseau(self) -> dict[str, Any]: ...
