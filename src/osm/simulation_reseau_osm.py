@@ -23,6 +23,7 @@ class VoitureReseau:
         self.__avancement = 0.0
         self.__decalage = 0.0
         self.__clignotant = ''
+        self.__essais_detour = set()
         self.__distances = [0.0]
         for a, b in zip(points, points[1:]):
             self.__distances.append(self.__distances[-1] + math.dist(a, b))
@@ -62,6 +63,43 @@ class VoitureReseau:
 
     def set_clignotant(self, valeur):
         self.__clignotant = valeur
+
+    def get_decalage(self):
+        return self.__decalage
+
+    def ajuster_decalage(self, cible):
+        """Glissement progressif vers l'accotement, sans téléportation."""
+        pas = 0.8
+        if self.__decalage < cible:
+            self.__decalage = min(cible, self.__decalage + pas)
+        elif self.__decalage > cible:
+            self.__decalage = max(cible, self.__decalage - pas)
+
+    def get_indice_segment(self):
+        """Indice du nœud d'arrivée du tronçon parcouru."""
+        for i in range(1, len(self.__distances)):
+            if self.__avancement <= self.__distances[i]:
+                return i
+        return len(self.__distances) - 1
+
+    def marquer_detour(self, urgence_id, noeud):
+        """Ne tente un détour qu'une fois à chaque carrefour et par urgence."""
+        cle = (urgence_id, noeud)
+        if cle in self.__essais_detour:
+            return False
+        self.__essais_detour.add(cle)
+        return True
+
+    def changer_chemin(self, chemin, positions):
+        """Change la fin du parcours ; la portion déjà parcourue reste intacte."""
+        i = self.get_indice_segment()
+        if list(chemin[:i + 1]) != self.__chemin[:i + 1]:
+            raise ValueError("Le nouveau trajet doit garder le tronçon courant")
+        self.__chemin = list(chemin)
+        self.__points = [positions[n] for n in chemin]
+        self.__distances = [0.0]
+        for a, b in zip(self.__points, self.__points[1:]):
+            self.__distances.append(self.__distances[-1] + math.dist(a, b))
 
     def est_prioritaire(self):
         return bool(self.__service)
@@ -105,6 +143,7 @@ class SimulationReseauOSM:
         self.__urgences_noeud = {}     # noeud -> urgence ayant priorité
         self.__immobilisation = {}     # véhicule -> ticks sans avancer
         self.__attente_de = {}         # véhicule -> véhicule qui le bloque
+        self.__cedent_urgence = set()  # voitures normales en cours d'écartement
         self.__generateur = random.Random(graine)
         # Un trajet stable par provenance / destination, pour le carrefour choisi.
         # Ce cache ne concerne PAS les voitures ordinaires.
@@ -470,6 +509,118 @@ class SimulationReseauOSM:
             ))
         return numero
 
+    def __detour_pour_urgence(self, voiture, urgence, morceaux_urgence):
+        """Essaye de quitter la route d'une urgence au premier carrefour utile.
+
+        Les sens uniques sont respectés : tous les choix proviennent du graphe.
+        Un détour est abandonné s'il ramène sur la même route ou crée une boucle.
+        """
+        chemin = voiture.get_chemin()
+        indice = voiture.get_indice_segment()
+        destination = chemin[-1]
+        graphe = self.__reseau.get_graphe()
+
+        for j in range(indice, len(chemin) - 1):
+            distance = voiture.distance_noeud(j) - voiture.get_avancement()
+            if distance > 150:
+                break
+            noeud = chemin[j]
+            if noeud not in self.__intersections or distance < 20:
+                continue
+            # La voiture tourne déjà hors de l'itinéraire de l'urgence.
+            if (noeud, chemin[j + 1]) not in morceaux_urgence:
+                return False
+            if not voiture.marquer_detour(urgence.get_urgence_id(), noeud):
+                return False
+
+            ancienne_fin = sum(
+                math.dist(self.__positions[a], self.__positions[b])
+                for a, b in zip(chemin[j:], chemin[j + 1:])
+            )
+            prefixe = chemin[:j + 1]
+            autres_routes = sorted(graphe[noeud], key=lambda item: item[1])
+            meilleur = None
+            meilleure_distance = float('inf')
+
+            for autre, _ in autres_routes:
+                if autre in (chemin[j - 1], chemin[j + 1]):
+                    continue
+                if (noeud, autre) in morceaux_urgence:
+                    continue
+                suite = self.__reseau.dijkstra(autre, destination)
+                if not suite:
+                    continue
+                nouveau = prefixe + suite
+                if len(set(nouveau)) != len(nouveau):
+                    continue
+                longueur = sum(
+                    math.dist(self.__positions[a], self.__positions[b])
+                    for a, b in zip(nouveau[j:], nouveau[j + 1:])
+                )
+                if longueur > max(ancienne_fin * 2.2, ancienne_fin + 150):
+                    continue
+                if longueur < meilleure_distance:
+                    meilleur = nouveau
+                    meilleure_distance = longueur
+
+            if meilleur is not None:
+                voiture.changer_chemin(meilleur, self.__positions)
+                return True
+            return False
+        return False
+
+    def __reagir_aux_urgences(self):
+        """Anticiper une urgence derrière soi jusqu'à 240 px sur la même route.
+
+        Les voitures essaient d'abord de prendre un autre itinéraire.
+        Sinon, elles se rangent progressivement sur l'accotement droit.
+        """
+        self.__cedent_urgence.clear()
+        urgences = [v for v in self.__agents if v.est_prioritaire()]
+        normales = [v for v in self.__agents if not v.est_prioritaire()]
+
+        for urgence in urgences:
+            route_urgence = urgence.get_chemin()
+            morceaux = set(zip(route_urgence, route_urgence[1:]))
+            approches = {}
+            for i in range(1, len(route_urgence)):
+                debut = urgence.distance_noeud(i - 1)
+                fin = urgence.distance_noeud(i)
+                if fin < urgence.get_avancement() - 10:
+                    continue
+                if debut > urgence.get_avancement() + 260:
+                    break
+                approches[(route_urgence[i - 1], route_urgence[i])] = debut
+
+            for voiture in normales:
+                indice = voiture.get_indice_segment()
+                chemin = voiture.get_chemin()
+                morceau = (chemin[indice - 1], chemin[indice])
+                if morceau not in approches:
+                    continue
+                position_locale = voiture.get_avancement() - voiture.distance_noeud(indice - 1)
+                distance = (
+                    approches[morceau] + position_locale - urgence.get_avancement()
+                )
+                if 0 <= distance <= 240:
+                    self.__cedent_urgence.add(voiture)
+                    self.__detour_pour_urgence(voiture, urgence, morceaux)
+
+        for voiture in normales:
+            doit_ceder = voiture in self.__cedent_urgence
+            indice = voiture.get_indice_segment()
+            chemin = voiture.get_chemin()
+            # Ne pas se décaler en plein carrefour ou juste avant un virage.
+            pres_carrefour = False
+            for j in (indice - 1, indice):
+                if (0 < j < len(chemin) - 1
+                        and chemin[j] in self.__intersections
+                        and abs(voiture.distance_noeud(j)
+                                - voiture.get_avancement()) < 28):
+                    pres_carrefour = True
+                    break
+            voiture.ajuster_decalage(10.0 if doit_ceder and not pres_carrefour else 0.0)
+
     def __priorites(self):
         """Pour chaque carrefour, prioritaire le plus urgent à proximité."""
         self.__urgences_noeud.clear()
@@ -647,6 +798,7 @@ class SimulationReseauOSM:
             if self.__depart_libre(agent):
                 self.__agents.append(agent)
                 self.__urgences_attente.remove(agent)
+        self.__reagir_aux_urgences()
         self.__priorites()
         # Libérer les réservations terminées.
         for noeud, agent in list(self.__reservations.items()):
@@ -657,7 +809,13 @@ class SimulationReseauOSM:
 
         for voiture in sorted(self.__agents, key=lambda a: a.get_avancement(), reverse=True):
             ancien = voiture.get_avancement()
-            cible = min(voiture.get_longueur(), ancien + voiture.get_vitesse())
+            vitesse = voiture.get_vitesse()
+            # Une voiture rangée sur le côté ralentit pour laisser doubler.
+            # Elle reprend sa vitesse dès que l'urgence l'a dépassée.
+            if (voiture in self.__cedent_urgence
+                    and voiture.get_decalage() >= 7):
+                vitesse = min(vitesse, 0.7)
+            cible = min(voiture.get_longueur(), ancien + vitesse)
             cible, a_reserver = self.__controle_intersections(voiture, cible)
             if cible > voiture.get_avancement() and not self.__route_libre(voiture, cible):
                 cible = voiture.get_avancement()
