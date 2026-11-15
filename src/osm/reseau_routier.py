@@ -21,6 +21,7 @@ TERRE = 6371000
 
 
 class CarrefourOSM(TypedDict):
+    """Représente CarrefourOSM dans l'application."""
     id: str
     nom: str
     latitude: float
@@ -28,6 +29,7 @@ class CarrefourOSM(TypedDict):
 
 
 class CandidatCarrefour(CarrefourOSM):
+    """Représente CandidatCarrefour dans l'application."""
     nb_rues: int
     nb_branches: int
     feu: bool
@@ -35,6 +37,7 @@ class CandidatCarrefour(CarrefourOSM):
 
 
 class ReseauRoutier:
+    """Représente ReseauRoutier dans l'application."""
     def __init__(self, fichier: str) -> None:
         self.__noeuds: dict[str, tuple[float, float]] = {}
         self.__graphe: defaultdict[str, list[tuple[str, float]]] = defaultdict(list)
@@ -96,15 +99,19 @@ class ReseauRoutier:
             raise ValueError('Aucune route utilisable dans ce fichier OSM.')
 
     def get_noeuds(self) -> dict[str, tuple[float, float]]:
+        """Récupère le traitement « get noeuds »."""
         return self.__noeuds
 
     def get_graphe(self) -> dict[str, list[tuple[str, float]]]:
+        """Récupère le traitement « get graphe »."""
         return self.__graphe
 
     def get_segments(self) -> list[tuple[str, str]]:
+        """Récupère le traitement « get segments »."""
         return self.__segments
 
     def get_intersections(self) -> set[str]:
+        """Récupère le traitement « get intersections »."""
         return {n for n, voisins in self.__voisins.items() if len(voisins) >= 3}
 
     def carrefours(self) -> list[CarrefourOSM]:
