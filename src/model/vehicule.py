@@ -10,6 +10,7 @@ from src.model.place import Place
 class Vehicule:
     """Représente Vehicule dans l'application."""
     def __init__(self, x: float, y: float, vitesse: float, direction: str, destination: str | None = None) -> None:
+        """Initialise l'objet et ses attributs."""
         self.__x = x
         self.__y = y
         self.__vitesse = float(vitesse)
@@ -65,6 +66,7 @@ class Vehicule:
         return self.__clignotant
 
     def activer_clignotant(self, cote: str, duree: int = 25) -> None:
+        """Exécute le traitement « activer clignotant »."""
         self.__clignotant = cote
         self.__temps_clignotant = duree
 
@@ -102,42 +104,51 @@ class Vehicule:
         """Récupère le traitement « get etat »."""
         return self.__etat
     def set_etat(self, etat: str) -> None:
+        """Définit le traitement « set etat »."""
         self.__etat = etat
 
     def get_trajet(self) -> list[tuple[float, float]]:
         """Récupère le traitement « get trajet »."""
         return self.__trajet
     def set_trajet(self, trajet: list[tuple[float, float]]) -> None:
+        """Définit le traitement « set trajet »."""
         self.__trajet = trajet
 
     def get_place(self) -> Place | None:
         """Récupère le traitement « get place »."""
         return self.__place
     def set_place(self, place: Place | None) -> None:
+        """Définit le traitement « set place »."""
         self.__place = place
 
     def get_timer(self) -> int:
         """Récupère le traitement « get timer »."""
         return self.__timer
     def set_timer(self, timer: int) -> None:
+        """Définit le traitement « set timer »."""
         self.__timer = timer
 
     def get_veut_se_garer(self) -> bool:
         """Récupère le traitement « get veut se garer »."""
         return self.__veut_se_garer
     def set_veut_se_garer(self, valeur: bool) -> None:
+        """Définit le traitement « set veut se garer »."""
         self.__veut_se_garer = valeur
 
     def set_x(self, valeur: float) -> None:
+        """Définit le traitement « set x »."""
         self.__x = valeur
 
     def set_y(self, valeur: float) -> None:
+        """Définit le traitement « set y »."""
         self.__y = valeur
 
     def set_destination(self, destination: str | None) -> None:
+        """Définit le traitement « set destination »."""
         self.__destination = destination
 
     def set_direction(self, nouvelle_direction: str) -> None:
+        """Définit le traitement « set direction »."""
         if nouvelle_direction != self.__direction:
             self.__decalage_lateral = 0
         self.__direction = nouvelle_direction
@@ -196,6 +207,7 @@ class Vehicule:
             self.__x += delta
 
     def avancer(self, vitesse_calculee: float | None = None) -> None:
+        """Fait avancer le traitement « avancer »."""
         if vitesse_calculee is None:
             vitesse = self.__vitesse
         else:
