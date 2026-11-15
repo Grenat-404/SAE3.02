@@ -106,6 +106,9 @@ class SimulationReseauOSM:
         self.__immobilisation = {}     # véhicule -> ticks sans avancer
         self.__attente_de = {}         # véhicule -> véhicule qui le bloque
         self.__generateur = random.Random(graine)
+        # Un trajet stable par provenance / destination, pour le carrefour choisi.
+        # Ce cache ne concerne PAS les voitures ordinaires.
+        self.__trajets_urgences = {}
 
         # Pour avoir un trafic réel, départs et arrivées sont en dehors
         # de la zone où Qt affiche les routes.
@@ -273,79 +276,141 @@ class SimulationReseauOSM:
         zone = self.__generateur.choices(zones, weights=poids, k=1)[0]
         return self.__generateur.choice(groupes[zone])
 
-    def __choisir_itineraire(self, provenance=None, urgence=False, souhaite=None):
-        candidats = self.__entrees
-        if provenance in ('droite', 'gauche', 'bas', 'haut'):
-            # Provenance = côté par lequel la voiture entre dans la zone.
-            cx, cy = self.__positions[self.__centre_id]
-            angles = {'droite': math.pi, 'gauche': 0,
-                      'bas': -math.pi / 2, 'haut': math.pi / 2}
-            voulu = angles[provenance]
-            def ecart(n):
-                x, y = self.__positions[n]
-                angle = math.atan2(y-cy, x-cx)
-                return abs(math.atan2(math.sin(angle-voulu), math.cos(angle-voulu)))
-            candidats = sorted(self.__entrees, key=ecart)[:max(3, len(self.__entrees)//8)]
+    def __itineraire_urgence_fixe(self, provenance, souhaite):
+        """Même itinéraire pour un même carrefour et les mêmes directions.
 
-        paires = []
+        Un calcul Dijkstra sans hasard est mémorisé. Les demandes ultérieures
+        réutilisent exactement les mêmes nœuds, même si le trafic a changé.
+        """
+        cle = (provenance, souhaite)
+        if cle in self.__trajets_urgences:
+            chemin = self.__trajets_urgences[cle]
+            return list(chemin) if chemin is not None else None
+
+        # Côté d'origine (d'où arrive le véhicule) et direction de sortie.
+        # Les directions correspondent aux valeurs du panneau des urgences.
+        angles_origine = {
+            'droite': math.pi, 'gauche': 0.0,
+            'bas': -math.pi / 2, 'haut': math.pi / 2
+        }
+        angles_sortie = {
+            'droite': 0.0, 'gauche': math.pi,
+            'bas': math.pi / 2, 'haut': -math.pi / 2
+        }
+        cx, cy = self.__positions[self.__centre_id]
+        angle_entree = angles_origine.get(provenance)
+        direction_sortie = souhaite if souhaite is not None else provenance
+        angle_sortie = angles_sortie.get(direction_sortie)
+
+        def ecart_angle(noeud, angle):
+            if angle is None:
+                return 0.0
+            x, y = self.__positions[noeud]
+            a = math.atan2(y - cy, x - cx)
+            return abs(math.atan2(math.sin(a - angle), math.cos(a - angle)))
+
+        # Les identifiants départagent les égalités : aucun tirage aléatoire.
+        entrees = sorted(
+            self.__entrees,
+            key=lambda n: (ecart_angle(n, angle_entree),
+                           math.dist(self.__positions[n], (cx, cy)), n)
+        )
+        sorties = sorted(
+            self.__sorties,
+            key=lambda n: (ecart_angle(n, angle_sortie),
+                           math.dist(self.__positions[n], (cx, cy)), n)
+        )
+
+        # On limite les recherches de Dijkstra pour ne pas interrompre
+        # trop longtemps le serveur avec les grandes cartes.
+        # Si le premier groupe ne suffit pas, on élargit une fois.
+        sortie_cache = {}
+        for maximum in (12, 36):
+            for debut in entrees[:maximum]:
+                avant = self.__reseau.dijkstra(debut, self.__centre_id)
+                if not avant or len(avant) < 2:
+                    continue
+                # Si tout droit est demandé, privilégier une sortie dans
+                # le prolongement du trajet. Une route tortueuse peut
+                # nécessiter un repli lorsqu'aucun axe rectiligne n'existe.
+                for tout_droit_souple in (False, True):
+                    if souhaite is not None and tout_droit_souple:
+                        continue
+                    for fin in sorties[:maximum]:
+                        if debut == fin:
+                            continue
+                        if fin not in sortie_cache:
+                            sortie_cache[fin] = self.__reseau.dijkstra(
+                                self.__centre_id, fin
+                            )
+                        apres = sortie_cache[fin]
+                        if not apres or len(apres) < 2:
+                            continue
+                        x1, y1 = self.__positions[apres[0]]
+                        x2, y2 = self.__positions[apres[1]]
+                        direction = math.atan2(y2 - y1, x2 - x1)
+                        if angle_sortie is not None and not tout_droit_souple:
+                            diff = abs(math.atan2(
+                                math.sin(direction - angle_sortie),
+                                math.cos(direction - angle_sortie)
+                            ))
+                            if diff > math.pi / 3:
+                                continue
+                        chemin = avant + apres[1:]
+                        if len(set(chemin)) != len(chemin):
+                            continue
+                        minimum_noeuds = 3 if self.__carte_compacte else 5
+                        if len(chemin) < minimum_noeuds:
+                            continue
+                        longueur = sum(
+                            math.dist(self.__positions[a], self.__positions[b])
+                            for a, b in zip(chemin, chemin[1:])
+                        )
+                        if longueur <= (20 if self.__carte_compacte else 250):
+                            continue
+                        self.__trajets_urgences[cle] = tuple(chemin)
+                        return list(chemin)
+
+        self.__trajets_urgences[cle] = None
+        return None
+
+    def __choisir_itineraire(self, provenance=None, urgence=False, souhaite=None):
         if urgence:
-            # Une demande d'urgence ne doit pas échouer par simple malchance.
-            paires = [(a,b) for a in candidats for b in self.__sorties]
-            self.__generateur.shuffle(paires)
-        else:
-            occupation = self.__occupation_zones()
-            for _ in range(45):
-                # 55 % des départs au voisinage immédiat de la vue,
-                # 45 % sur les autres arrivées possibles.
-                groupes = self.__groupes_entrees
-                if (self.__groupes_entrees_proches
-                        and self.__generateur.random() < 0.55):
-                    groupes = self.__groupes_entrees_proches
-                debut = self.__choisir_noeud_reparti(groupes, occupation)
-                fin = self.__choisir_noeud_reparti(
-                    self.__groupes_sorties, occupation
-                )
-                paires.append((debut, fin))
+            return self.__itineraire_urgence_fixe(provenance, souhaite)
+
+        # Les véhicules ordinaires gardent leur tirage aléatoire d'origine.
+        occupation = self.__occupation_zones()
+        paires = []
+        for _ in range(45):
+            groupes = self.__groupes_entrees
+            if (self.__groupes_entrees_proches
+                    and self.__generateur.random() < 0.55):
+                groupes = self.__groupes_entrees_proches
+            debut = self.__choisir_noeud_reparti(groupes, occupation)
+            fin = self.__choisir_noeud_reparti(
+                self.__groupes_sorties, occupation
+            )
+            paires.append((debut, fin))
 
         for debut, fin in paires:
-            if debut == fin:
+            if debut == fin or debut is None or fin is None:
                 continue
-            if urgence:
-                # L'urgence passe par le carrefour sélectionné.
-                a = self.__reseau.dijkstra(debut, self.__centre_id)
-                b = self.__reseau.dijkstra(self.__centre_id, fin)
-                if not a or not b:
-                    continue
-                chemin = a + b[1:]
-                if len(set(chemin)) != len(chemin):
-                    continue
-            else:
-                chemin = self.__reseau.itineraire_aleatoire(
-                    debut, fin, self.__generateur
-                )
+            chemin = self.__reseau.itineraire_aleatoire(
+                debut, fin, self.__generateur
+            )
             if not chemin or len(chemin) < (3 if self.__carte_compacte else 5):
                 continue
-            longueur = sum(math.dist(self.__positions[x], self.__positions[y])
-                           for x, y in zip(chemin, chemin[1:]))
-            nb_intersections = sum(n in self.__intersections for n in chemin[1:-1])
-            # Les tests pédagogiques ont parfois une seule intersection
-            # et des trajets courts. Garder les critères de la ville inchangés.
+            longueur = sum(
+                math.dist(self.__positions[x], self.__positions[y])
+                for x, y in zip(chemin, chemin[1:])
+            )
+            nb_intersections = sum(
+                n in self.__intersections for n in chemin[1:-1]
+            )
             longueur_min = 20 if self.__carte_compacte else 250
-            intersections_min = 1 if self.__carte_compacte or urgence else 2
+            intersections_min = 1 if self.__carte_compacte else 2
             if longueur <= longueur_min or nb_intersections < intersections_min:
                 continue
-            if urgence and souhaite in ('droite', 'gauche', 'haut', 'bas'):
-                i = chemin.index(self.__centre_id)
-                if not 0 < i < len(chemin)-1:
-                    continue
-                x1,y1 = self.__positions[chemin[i]]
-                x2,y2 = self.__positions[chemin[i+1]]
-                angle = math.atan2(y2-y1,x2-x1)
-                angles_sortie = {'droite':0,'gauche':math.pi,
-                                 'haut':-math.pi/2,'bas':math.pi/2}
-                but = angles_sortie[souhaite]
-                if abs(math.atan2(math.sin(angle-but), math.cos(angle-but))) > math.pi/3:
-                    continue
             return chemin
         return None
 
@@ -353,7 +418,7 @@ class SimulationReseauOSM:
         points = [self.__positions[n] for n in chemin]
         voiture = VoitureReseau(
             chemin, points, 3.4 if service else self.__generateur.uniform(2.0, 3.0),
-            self.__generateur.choice(self.__couleurs),
+            'white' if service else self.__generateur.choice(self.__couleurs),
             service, priorite, urgence_id
         )
         return voiture
@@ -379,15 +444,25 @@ class SimulationReseauOSM:
         """Même méthode que l'ancien Simulation : panneau d'urgence inchangé."""
         numero = self.__prochain_id
         self.__prochain_id += 1
+        # Calculer tous les trajets avant d'enfiler les véhicules.
+        # Ainsi, une direction impossible ne génère pas une demi-demande.
+        trajets = []
         for config in vehicules:
             chemin = self.__choisir_itineraire(
                 provenance=config.get('direction'), urgence=True,
                 souhaite=config.get('destination')
             )
-            if chemin:
-                self.__urgences_attente.append(self.__nouvelle_voiture(
-                    chemin, config['service'], niveau_priorite, numero
-                ))
+            if not chemin:
+                raise ValueError(
+                    "Aucun trajet d'urgence possible pour cette provenance "
+                    "et cette direction sur le carrefour OSM choisi."
+                )
+            trajets.append((chemin, config['service']))
+
+        for chemin, service in trajets:
+            self.__urgences_attente.append(self.__nouvelle_voiture(
+                chemin, service, niveau_priorite, numero
+            ))
         return numero
 
     def __priorites(self):

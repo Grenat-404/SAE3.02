@@ -14,6 +14,68 @@ class SimulationAntibouchonTests(unittest.TestCase):
         centre = ReseauRoutier(str(fichier)).carrefours()[0]["id"]
         return SimulationReseauOSM(str(fichier), centre, 1440, 900, graine=8)
 
+    def test_itineraires_urgence_fixes_trafic_aleatoire(self):
+        # Même carte et carrefour : le parcours des urgences ne dépend
+        # ni de la graine aléatoire ni des voitures ordinaires apparues.
+        premier = self.simulation()
+        second = self.simulation()
+        configurations = [
+            (direction, sortie)
+            for direction in ("droite", "gauche", "haut", "bas")
+            for sortie in (None, "droite", "gauche", "haut", "bas")
+        ]
+        trouves = 0
+        for direction, sortie in configurations:
+            trajet = premier._SimulationReseauOSM__choisir_itineraire(
+                provenance=direction, urgence=True, souhaite=sortie
+            )
+            if not trajet:
+                continue
+            # Perturber l'état de la circulation entre deux appels.
+            for _ in range(5):
+                premier.avancer()
+            suivant = premier._SimulationReseauOSM__choisir_itineraire(
+                provenance=direction, urgence=True, souhaite=sortie
+            )
+            autre = second._SimulationReseauOSM__choisir_itineraire(
+                provenance=direction, urgence=True, souhaite=sortie
+            )
+            self.assertEqual(trajet, suivant)
+            self.assertEqual(trajet, autre)
+            self.assertIn(premier._SimulationReseauOSM__centre_id, trajet)
+            trouves += 1
+            if trouves >= 3:
+                break
+        self.assertGreater(trouves, 0, "Aucun trajet d'urgence sur la grille")
+
+    def test_plusieurs_urgences_meme_trajet(self):
+        sim = self.simulation()
+        for direction in ("droite", "gauche", "haut", "bas"):
+            trajet = sim._SimulationReseauOSM__choisir_itineraire(
+                provenance=direction, urgence=True, souhaite=None
+            )
+            if trajet:
+                configuration = [
+                    {"direction": direction, "destination": None,
+                     "service": "ambulance"}
+                    for _ in range(2)
+                ]
+                sim.creer_urgence("Accident", 3, configuration)
+                attente = sim._SimulationReseauOSM__urgences_attente
+                self.assertEqual(attente[-1].get_chemin(), attente[-2].get_chemin())
+                self.assertIsNot(attente[-1], attente[-2])
+                return
+        self.fail("Aucune direction d'urgence n'est accessible sur cette carte")
+
+    def test_trafic_ordinaire_garde_du_hasard(self):
+        sim = self.simulation()
+        a = [
+            tuple(sim._SimulationReseauOSM__choisir_itineraire() or [])
+            for _ in range(12)
+        ]
+        routes = {chemin for chemin in a if chemin}
+        self.assertGreater(len(routes), 1)
+
     def test_densite_plafonnee(self):
         sim = self.simulation()
         for _ in range(600):
