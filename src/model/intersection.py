@@ -10,6 +10,7 @@ from src.model.vehicule import Vehicule
 class Intersection:
     """Représente Intersection dans l'application."""
     def __init__(self, x: int, y: int, largeur: int, hauteur: int) -> None:
+        """Initialise l'objet et ses attributs."""
         self.__x = x
         self.__y = y
         self.__largeur = largeur
@@ -32,6 +33,7 @@ class Intersection:
         return self.__hauteur
 
     def contient(self, vehicule: Vehicule) -> bool:
+        """Vérifie le traitement « contient »."""
         return (
             self.__x <= vehicule.get_x() <= self.__x + self.__largeur
             and
