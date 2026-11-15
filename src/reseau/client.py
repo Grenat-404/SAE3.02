@@ -18,6 +18,7 @@ from src.reseau.protocole import (PORT_TCP, PORT_UDP, SIGNATURE, GROUPE_MULTICAS
 class ClientReseau(threading.Thread):
     """Représente ClientReseau dans l'application."""
     def __init__(self, largeur: int, hauteur: int, recevoir_etat: Callable[[dict[str, Any]], None], recevoir_reponse: Callable[[dict[str, Any]], None], port_tcp: int = PORT_TCP, port_udp: int = PORT_UDP) -> None:
+        """Initialise l'objet et ses attributs."""
         super().__init__(daemon=True)
         self.__largeur = largeur
         self.__hauteur = hauteur
@@ -50,6 +51,7 @@ class ClientReseau(threading.Thread):
             self.__socket.close()
 
     def envoyer_urgence(self, type_urgence: str, niveau_priorite: int, vehicules: list[VehiculeUrgence]) -> int:
+        """Exécute le traitement « envoyer urgence »."""
         if not self.connecte():
             raise ConnectionError("Serveur non connecté : demande non envoyée")
         with self.__verrou:
@@ -95,6 +97,7 @@ class ClientReseau(threading.Thread):
         return None
 
     def __session(self, adresse: tuple[str, int]) -> None:
+        """Exécute le traitement « session »."""
         tcp = socket.create_connection(adresse, timeout=3)
         self.__socket = tcp
         tcp.setblocking(False)
