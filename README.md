@@ -6,8 +6,8 @@ L'application simule la circulation routière autour d'un carrefour et permet de
 
 Le projet propose deux modes :
 
-- un **carrefour prédéfini**, avec circulation aléatoire, feux, parking, passages piétons et véhicules prioritaires ;
-- un **mode OpenStreetMap hors ligne**, capable de charger des cartes locales `.osm`, de détecter plusieurs carrefours et de faire circuler les véhicules sur le réseau routier avec calcul d'itinéraires.
+- un **carrefour prédéfini**, avec circulation aléatoire, feux, parking, passages piétons et véhicules prioritaires
+- un **mode OpenStreetMap hors ligne**, capable de charger des cartes locales `.osm`, de détecter plusieurs carrefours et de faire circuler les véhicules sur le réseau routier avec calcul d'itinéraires
 
 ---
 
@@ -24,24 +24,24 @@ Le projet propose deux modes :
 
 Le projet comprend notamment :
 
-- simulation graphique en **Python 3 / PyQt6** ;
-- architecture **client/serveur** ;
-- communication par sockets **TCP et UDP** ;
-- découverte automatique du serveur sur le réseau local ;
-- trafic routier aléatoire ;
-- gestion des feux de circulation ;
-- gestion des priorités et des conflits au carrefour ;
-- véhicules d'urgence : ambulance, pompiers, police et autres véhicules prioritaires prévus par la simulation ;
-- adaptation du comportement des véhicules normaux lors du passage d'un véhicule prioritaire ;
-- parking ;
-- passages piétons et piétons ;
-- mode OpenStreetMap entièrement **hors ligne** ;
-- chargement de cartes `.osm` locales ;
-- gestion de plusieurs intersections ;
-- prise en compte des sens uniques ;
-- calcul d'itinéraires sur le réseau routier ;
-- stockage des résultats dans une base **SQLite** côté serveur ;
-- tests unitaires et tests réseau.
+- simulation graphique en **Python 3 / PyQt6**
+- architecture **client/serveur**
+- communication par sockets **TCP et UDP**
+- découverte automatique du serveur sur le réseau local
+- trafic routier aléatoire
+- gestion des feux de circulation
+- gestion des priorités et des conflits au carrefour
+- véhicules d'urgence : ambulance, pompiers, police et autres véhicules prioritaires prévus par la simulation
+- adaptation du comportement des véhicules normaux lors du passage d'un véhicule prioritaire
+- parking
+- passages piétons et piétons
+- mode OpenStreetMap entièrement **hors ligne**
+- chargement de cartes `.osm` locales
+- gestion de plusieurs intersections
+- prise en compte des sens uniques
+- calcul d'itinéraires sur le réseau routier
+- stockage des résultats dans une base **SQLite** côté serveur
+- tests unitaires et tests réseau
 
 ---
 
@@ -51,9 +51,9 @@ Le projet comprend notamment :
 
 Le projet nécessite :
 
-- **Python 3.10 ou plus récent** ;
-- **Git** ;
-- une connexion réseau locale entre le serveur et le client si deux machines ou deux VM sont utilisées.
+- **Python 3.10 ou plus récent**
+- **Git**
+- une connexion réseau locale entre le serveur et le client si deux machines ou deux VM sont utilisées
 
 La seule dépendance Python externe nécessaire au fonctionnement du projet est indiquée dans `requirements.txt` :
 
@@ -71,8 +71,8 @@ Le module `sqlite3` utilisé pour la base de données fait partie de la biblioth
 
 Installer :
 
-- Python 3.10 ou plus récent ;
-- Git for Windows.
+- Python 3.10 ou plus récent
+- Git for Windows
 
 Vérifier ensuite dans PowerShell :
 
@@ -355,13 +355,13 @@ Dans le sélecteur situé en haut de la fenêtre :
 
 Ce mode correspond au carrefour historique du projet et comprend notamment :
 
-- circulation automatique ;
-- feux ;
-- parking ;
-- passages piétons ;
-- véhicules normaux ;
-- véhicules prioritaires ;
-- gestion du passage des secours.
+- circulation automatique
+- feux
+- parking
+- passages piétons
+- véhicules normaux
+- véhicules prioritaires
+- gestion du passage des secours
 
 ## Régler l'apparition des piétons
 
@@ -405,9 +405,9 @@ data/maps/
 
 Pour lancer une carte OSM :
 
-1. sélectionner la carte dans la liste **Carte** ;
-2. sélectionner le carrefour souhaité dans la liste **Centre** ;
-3. cliquer sur **Charger**.
+1. sélectionner la carte dans la liste **Carte**
+2. sélectionner le carrefour souhaité dans la liste **Centre**
+3. cliquer sur **Charger**
 
 Le programme charge alors le réseau autour de l'intersection choisie et lance la simulation correspondante.
 
@@ -431,12 +431,12 @@ Le panneau d'urgence du client permet d'envoyer une demande au serveur.
 
 Les demandes peuvent notamment préciser :
 
-- le type d'urgence ;
-- le niveau de priorité ;
-- le ou les véhicules prioritaires ;
-- leur service ;
-- leur direction d'arrivée ;
-- leur destination.
+- le type d'urgence
+- le niveau de priorité
+- le ou les véhicules prioritaires
+- leur service
+- leur direction d'arrivée
+- leur destination
 
 Le serveur valide la demande, crée les véhicules d'urgence et adapte la circulation afin de faciliter leur passage.
 
@@ -470,11 +470,11 @@ Une ligne est créée pour chaque simulation lancée.
 
 Elle conserve notamment :
 
-- la date de début ;
-- la date de fin ;
-- le mode `classique` ou `osm` ;
-- la carte utilisée ;
-- le carrefour choisi.
+- la date de début
+- la date de fin
+- le mode `classique` ou `osm`
+- la carte utilisée
+- le carrefour choisi
 
 ### `statistiques`
 
@@ -482,19 +482,19 @@ Une ligne est enregistrée pour chaque simulation terminée.
 
 Elle conserve notamment :
 
-- la durée ;
-- le nombre maximum de véhicules présents ;
-- le nombre moyen de véhicules présents ;
-- le nombre de demandes d'urgence.
+- la durée
+- le nombre maximum de véhicules présents
+- le nombre moyen de véhicules présents
+- le nombre de demandes d'urgence
 
 ### `urgences`
 
 Cette table conserve l'historique des demandes d'urgence acceptées :
 
-- date et heure ;
-- type d'urgence ;
-- priorité ;
-- nombre de véhicules prioritaires concernés.
+- date et heure
+- type d'urgence
+- priorité
+- nombre de véhicules prioritaires concernés
 
 ---
 
