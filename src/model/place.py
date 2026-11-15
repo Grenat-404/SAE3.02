@@ -8,6 +8,7 @@ from __future__ import annotations
 class Place:
     """Représente Place dans l'application."""
     def __init__(self, x: int, y: int, largeur: int, hauteur: int) -> None:
+        """Initialise l'objet et ses attributs."""
         self.__x = x
         self.__y = y
         self.__largeur = largeur
@@ -30,4 +31,5 @@ class Place:
         """Récupère le traitement « get occupee »."""
         return self.__occupee
     def set_occupee(self, valeur: bool) -> None:
+        """Définit le traitement « set occupee »."""
         self.__occupee = valeur
