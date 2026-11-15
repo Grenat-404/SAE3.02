@@ -11,6 +11,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QWidget,QVBoxLayout,QHBoxLayout,QLabel,QComboBox,QSpinBox,QPushButton,QListWidget,QFrame
 
 class FenetreUrgence(QWidget):
+    """Représente FenetreUrgence dans l'application."""
 
     def __init__(self, simulation: SimulationDistante, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -93,6 +94,7 @@ class FenetreUrgence(QWidget):
 
     # Partie principale : gestion de l'interface
     def __creer_interface(self) -> None:
+        """Exécute le traitement « creer interface »."""
         layout_principal = QVBoxLayout(self)
         layout_principal.setAlignment(Qt.AlignmentFlag.AlignTop)
         layout_principal.setContentsMargins(8, 8, 8, 8)
@@ -190,6 +192,7 @@ class FenetreUrgence(QWidget):
         layout.addWidget(self.__label_message)
 
     def __basculer_panneau(self) -> None:
+        """Exécute le traitement « basculer panneau »."""
         if self.__panneau_reduit:
             self.__contenu.show()
             self.setFixedWidth(self.__largeur_ouverte)
@@ -212,6 +215,7 @@ class FenetreUrgence(QWidget):
         self.update()
 
     def __ajouter_vehicule(self) -> None:
+        """Exécute le traitement « ajouter vehicule »."""
         service = self.__combo_service.currentData()
         nom_service = self.__combo_service.currentText()
         direction = self.__combo_provenance.currentData()
@@ -235,6 +239,7 @@ class FenetreUrgence(QWidget):
         self.__label_message.setText("Véhicule ajouté.")
 
     def __retirer_vehicule(self) -> None:
+        """Exécute le traitement « retirer vehicule »."""
         ligne = (self.__liste_vehicules.currentRow())
 
         if ligne < 0:
@@ -247,6 +252,7 @@ class FenetreUrgence(QWidget):
 
     # Partie principale : envoi au serveur
     def __declencher_urgence(self) -> None:
+        """Exécute le traitement « declencher urgence »."""
         if len(self.__vehicules_en_attente) == 0:
             self.__label_message.setText("Ajoute au moins un véhicule.")
             return
@@ -278,6 +284,7 @@ class FenetreUrgence(QWidget):
         self.__liste_vehicules.clear()
 
     def __reinitialiser_simulation(self) -> None:
+        """Exécute le traitement « reinitialiser simulation »."""
         try:
             self.__simulation.reinitialiser()
         except ConnectionError as erreur:
