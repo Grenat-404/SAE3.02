@@ -11,6 +11,7 @@ from src.model.place import Place
 class Parking:
     """Représente Parking dans l'application."""
     def __init__(self, x: int, y: int, largeur: int, hauteur: int, trottoir: int = 20) -> None:
+        """Initialise l'objet et ses attributs."""
         self.__x = x
         self.__y = y
         self.__largeur = largeur
@@ -93,11 +94,13 @@ class Parking:
         return random.choice(libres)
 
     def get_trajet_entree(self, place: Place) -> list[tuple[float, float]]:
+        """Récupère le traitement « get trajet entree »."""
         cx = place.get_x() + place.get_largeur() / 2
         cy = place.get_y() + place.get_hauteur() / 2
         return [ (self.__entree[0], self.__y_est), (cx, self.__y_est), (cx, cy) ]
 
     def get_trajet_sortie(self, place: Place, y_route: float) -> list[tuple[float, float]]:
+        """Récupère le traitement « get trajet sortie »."""
         cx = place.get_x() + place.get_largeur() / 2
         return [
             (cx, self.__y_ouest),
