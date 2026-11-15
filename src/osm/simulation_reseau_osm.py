@@ -103,6 +103,8 @@ class SimulationReseauOSM:
         self.__carte_compacte = len(self.__reseau.get_noeuds()) <= 20
         self.__reservations = {}       # noeud -> véhicule engagé
         self.__urgences_noeud = {}     # noeud -> urgence ayant priorité
+        self.__immobilisation = {}     # véhicule -> ticks sans avancer
+        self.__attente_de = {}         # véhicule -> véhicule qui le bloque
         self.__generateur = random.Random(graine)
 
         # Pour avoir un trafic réel, départs et arrivées sont en dehors
@@ -339,6 +341,66 @@ class SimulationReseauOSM:
                         self.__urgences_noeud[noeud] = agent
                     break
 
+    def __sortie_libre(self, voiture, indice):
+        """Ne pas entrer dans un carrefour si sa sortie est encombrée."""
+        centre = voiture.distance_noeud(indice)
+        ancien = voiture.get_avancement()
+        # Tester un point situé juste après l'intersection.
+        voiture.set_avancement(min(centre + 38, voiture.get_longueur()))
+        x, y, angle = voiture.position()
+        voiture.set_avancement(ancien)
+        ux, uy = math.cos(angle), math.sin(angle)
+
+        for autre in self.__agents:
+            if autre is voiture:
+                continue
+            ax, ay, direction = autre.position()
+            dx, dy = ax - x, ay - y
+            if dx * dx + dy * dy > 65 * 65:
+                continue
+            # Uniquement les voitures dans le même sens et dans la même voie.
+            if math.cos(angle - direction) < 0.7:
+                continue
+            longitudinal = dx * ux + dy * uy
+            lateral = abs(dx * uy - dy * ux)
+            if -22 < longitudinal < 32 and lateral < 12:
+                self.__attente_de[voiture] = autre
+                return False
+
+        # Deux carrefours accolés : éviter de réserver le premier si
+        # le second est occupé ou si son feu est rouge.
+        chemin = voiture.get_chemin()
+        for j in range(indice + 1, len(chemin) - 1):
+            distance = voiture.distance_noeud(j) - centre
+            if distance > 65:
+                break
+            suivant = chemin[j]
+            if suivant not in self.__intersections:
+                continue
+            reserve = self.__reservations.get(suivant)
+            if reserve is not None and reserve is not voiture:
+                self.__attente_de[voiture] = reserve
+                return False
+            if (not voiture.est_prioritaire()
+                    and self.__reseau.a_feu_osm(suivant)
+                    and self.get_etat_feu(suivant, chemin[j - 1]) != 'vert'):
+                return False
+        return True
+
+    def __devant_urgence(self, voiture, urgence, noeud, precedent):
+        """Autoriser la voiture devant l'ambulance à libérer son approche."""
+        chemin = urgence.get_chemin()
+        for i in range(1, len(chemin)):
+            if chemin[i] != noeud or chemin[i - 1] != precedent:
+                continue
+            restant_urgence = urgence.distance_noeud(i) - urgence.get_avancement()
+            for j in range(1, len(voiture.get_chemin())):
+                if (voiture.get_chemin()[j] == noeud
+                        and voiture.get_chemin()[j - 1] == precedent):
+                    restant_voiture = voiture.distance_noeud(j) - voiture.get_avancement()
+                    return 0 <= restant_voiture < restant_urgence
+        return False
+
     def __route_libre(self, voiture, cible):
         """Seulement le véhicule devant sur la même voie, pas le côté."""
         ancien = voiture.get_avancement()
@@ -357,7 +419,8 @@ class SimulationReseauOSM:
                 continue
             devant = dx * ux + dy * uy
             lateral = abs(dx * uy - dy * ux)
-            if 0 < devant < 32 and lateral < 11:
+            if -5 < devant < 32 and lateral < 11:
+                self.__attente_de[voiture] = autre
                 return False
         return True
 
@@ -389,7 +452,13 @@ class SimulationReseauOSM:
                 autorise = urgence is None or urgence is voiture or (
                     urgence.get_urgence_id() == voiture.get_urgence_id())
             elif urgence is not None:
-                autorise = False
+                # La voiture juste devant le véhicule prioritaire doit
+                # pouvoir dégager le carrefour au lieu de le bloquer.
+                autorise = self.__devant_urgence(
+                    voiture, urgence, noeud, precedent
+                )
+            if verrou is not None and verrou is not voiture:
+                self.__attente_de[voiture] = verrou
             # Voiture sans permission : arrêt avant la zone centrale.
             if not autorise or (verrou is not None and verrou is not voiture):
                 if voiture.get_avancement() <= stop:
@@ -397,6 +466,13 @@ class SimulationReseauOSM:
                 elif voiture.get_avancement() <= centre + 24:
                     cible = voiture.get_avancement()
                 return cible, None
+            # Ne pas bloquer un carrefour en restant arrêté juste après.
+            # Cette vérification s'applique avant d'y entrer, jamais une
+            # fois qu'une voiture est déjà engagée.
+            if voiture.get_avancement() <= stop < cible:
+                if not self.__sortie_libre(voiture, i):
+                    return min(cible, stop), None
+
             # La réservation sera prise seulement après le contrôle des voitures.
             if voiture.get_avancement() <= stop < cible:
                 a_reserver = noeud
@@ -409,7 +485,15 @@ class SimulationReseauOSM:
 
     def avancer(self):
         self.__tick += 1
-        if self.__generateur.random() < 0.06:
+        self.__attente_de.clear()
+
+        # Conserver le trafic dense quand la carte circule, mais diminuer
+        # les arrivées quand une grande partie des véhicules attend déjà.
+        arretes = sum(self.__immobilisation.get(v, 0) > 80
+                      for v in self.__agents)
+        taux = arretes / max(1, len(self.__agents))
+        frequence = 0.06 if taux < 0.35 else (0.012 if taux < 0.60 else 0.0)
+        if self.__generateur.random() < frequence:
             self.__apparition()
         for agent in list(self.__urgences_attente):
             if self.__depart_libre(agent):
@@ -424,13 +508,18 @@ class SimulationReseauOSM:
                 del self.__reservations[noeud]
 
         for voiture in sorted(self.__agents, key=lambda a: a.get_avancement(), reverse=True):
-            cible = min(voiture.get_longueur(), voiture.get_avancement() + voiture.get_vitesse())
+            ancien = voiture.get_avancement()
+            cible = min(voiture.get_longueur(), ancien + voiture.get_vitesse())
             cible, a_reserver = self.__controle_intersections(voiture, cible)
             if cible > voiture.get_avancement() and not self.__route_libre(voiture, cible):
                 cible = voiture.get_avancement()
             if a_reserver is not None and cible > voiture.get_avancement():
                 self.__reservations[a_reserver] = voiture
             voiture.set_avancement(cible)
+            if cible > ancien + 0.01:
+                self.__immobilisation[voiture] = 0
+            else:
+                self.__immobilisation[voiture] = self.__immobilisation.get(voiture, 0) + 1
             # Clignotant local : différence d'angle entre deux segments.
             voiture.set_clignotant('')
             for i in range(1, len(voiture.get_chemin()) - 1):
@@ -448,3 +537,32 @@ class SimulationReseauOSM:
                 break
 
         self.__agents = [v for v in self.__agents if v.get_avancement() < v.get_longueur() - 1]
+        self.__immobilisation = {
+            v: self.__immobilisation.get(v, 0) for v in self.__agents
+        }
+
+        # Filet de sécurité pour un interblocage qui dure plus de 18 secondes.
+        # Un seul véhicule normal est retiré, au maximum toutes les 90 ticks.
+        # On privilégie celui qui retient le plus de voitures derrière lui.
+        if self.__tick % 90 == 0:
+            candidats = [
+                v for v in self.__agents
+                if not v.est_prioritaire() and self.__immobilisation.get(v, 0) >= 600
+            ]
+            if candidats:
+                bloqueurs = {}
+                for bloqueur in self.__attente_de.values():
+                    bloqueurs[bloqueur] = bloqueurs.get(bloqueur, 0) + 1
+                victime = max(
+                    candidats,
+                    key=lambda v: (bloqueurs.get(v, 0),
+                                   v in self.__reservations.values(),
+                                   self.__immobilisation[v])
+                )
+                self.__agents.remove(victime)
+                self.__immobilisation.pop(victime, None)
+                self.__reservations = {
+                    n: v for n, v in self.__reservations.items() if v is not victime
+                }
+                print('[OSM] Déblocage : retrait d\'un véhicule immobilisé',
+                      flush=True)
