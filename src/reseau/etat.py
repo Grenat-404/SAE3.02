@@ -18,6 +18,7 @@ class ObjetRectangulaire(Protocol):
     def get_hauteur(self) -> int: ...
 
 def rectangle(objet: ObjetRectangulaire) -> dict[str, float]:
+        """Récupère le traitement « get x »."""
     return {
         "x": objet.get_x(),
         "y": objet.get_y(),
@@ -26,6 +27,7 @@ def rectangle(objet: ObjetRectangulaire) -> dict[str, float]:
 
 # Partie principale : export JSON
 def construire_etat(simulation: Simulation) -> dict[str, Any]:
+    """Construit le traitement « construire etat »."""
     parking = simulation.get_parking()
     intersection = simulation.get_intersections()
     vehicules = []
