@@ -16,7 +16,9 @@ import src.reseau.serveur as module_serveur
 
 
 class SimulationFictive:
+    """Représente SimulationFictive dans l'application."""
     def __init__(self, largeur, hauteur):
+        """Initialise l'objet et ses attributs."""
         self.largeur = largeur
         self.hauteur = hauteur
         self.numero = 0
@@ -24,21 +26,26 @@ class SimulationFictive:
         self.ticks = 0
 
     def avancer(self):
+        """Exécute le traitement « avancer »."""
         self.ticks += 1
 
     def exporter_etat_reseau(self):
+        """Exécute le traitement « exporter etat reseau »."""
         return {"type": "etat", "ticks": self.ticks, "vehicules": [], "routes": [], "feux": []}
 
     def creer_urgence(self, type_urgence, niveau_priorite, vehicules):
+        """Crée le traitement « creer urgence »."""
         self.numero += 1
         self.urgences.append((type_urgence, niveau_priorite, vehicules))
         return self.numero
 
     def arreter(self):
+        """Arrête le traitement « arreter »."""
         pass
 
 
 def ports_libres():
+    """Exécute le traitement « ports libres »."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
         tcp = s.getsockname()[1]
@@ -49,11 +56,14 @@ def ports_libres():
 
 
 class TestReseau(unittest.TestCase):
+    """Représente TestReseau dans l'application."""
     def test_json_lignes(self):
+        """Exécute le traitement « test json lignes »."""
         message = {"type": "urgence", "service": "pompiers", "texte": "Réanimation"}
         self.assertEqual(decoder(encoder(message).rstrip(b"\n")), message)
 
     def test_validation(self):
+        """Exécute le traitement « test validation »."""
         valide = {"type_urgence": "Accident grave", "niveau_priorite": 3,
                   "vehicules": [{"service": "ambulance", "direction": "bas",
                                  "destination": "droite"}]}
@@ -63,6 +73,7 @@ class TestReseau(unittest.TestCase):
             verifier_urgence(invalide)
 
     def test_decouverte_et_urgence_reelle(self):
+        """Exécute le traitement « test decouverte et urgence reelle »."""
         original = module_serveur.Simulation
         module_serveur.Simulation = SimulationFictive
         tcp, udp = ports_libres()
