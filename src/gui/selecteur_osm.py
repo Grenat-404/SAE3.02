@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (QComboBox, QFrame, QHBoxLayout, QLabel, QPushButton
 from src.osm.reseau_routier import ReseauRoutier
 
 class SelecteurOSM(QFrame):
+    """Représente SelecteurOSM dans l'application."""
     carrefour_charge = pyqtSignal(object)
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -40,6 +41,7 @@ class SelecteurOSM(QFrame):
         self.adjustSize()
 
     def __lister_cartes(self) -> None:
+        """Exécute le traitement « lister cartes »."""
         self.__combo_cartes.addItem('Carrefour prédéfini', None)
         dossier = Path(__file__).resolve().parents[2] / 'data' / 'maps'
         dossier.mkdir(parents=True, exist_ok=True)
@@ -47,6 +49,7 @@ class SelecteurOSM(QFrame):
             self.__combo_cartes.addItem(fichier.stem, str(fichier))
 
     def __actualiser(self) -> None:
+        """Exécute le traitement « actualiser »."""
         self.__combo_carrefours.clear()
         chemin = self.__combo_cartes.currentData()
         if chemin is None:
@@ -69,6 +72,7 @@ class SelecteurOSM(QFrame):
             self.__combo_carrefours.addItem('Aucune intersection détectée')
 
     def __charger(self) -> None:
+        """Exécute le traitement « charger »."""
         chemin = self.__combo_cartes.currentData()
         if chemin is None:
             self.carrefour_charge.emit(None)
