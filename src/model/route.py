@@ -8,6 +8,7 @@ from __future__ import annotations
 class Route:
     """Représente Route dans l'application."""
     def __init__(self, x: int, y: int, largeur: int, hauteur: int) -> None:
+        """Initialise l'objet et ses attributs."""
         self.__x = x
         self.__y = y
         self.__largeur = largeur
