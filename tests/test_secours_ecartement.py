@@ -13,11 +13,14 @@ from src.simulation.simulation import Simulation
 
 
 def configuration(direction, service="police"):
+    """Exécute le traitement « configuration »."""
     return {"direction": direction, "service": service, "destination": None}
 
 
 class TestSecoursEtEcartement(unittest.TestCase):
+    """Représente TestSecoursEtEcartement dans l'application."""
     def test_plusieurs_secours_de_meme_provenance(self):
+        """Exécute le traitement « test plusieurs secours de meme provenance »."""
         for direction in ("droite", "gauche", "haut", "bas"):
             with self.subTest(direction=direction):
                 simulation = Simulation(1600, 900)
@@ -36,6 +39,7 @@ class TestSecoursEtEcartement(unittest.TestCase):
                 self.assertEqual(len(set(positions)), 3)
 
     def test_secours_hors_ecran_rejoint_simulation(self):
+        """Exécute le traitement « test secours hors ecran rejoint simulation »."""
         simulation = Simulation(1600, 900)
         simulation.get_vehicules().clear()
         simulation.creer_urgence("Secours", 4, [
@@ -51,6 +55,7 @@ class TestSecoursEtEcartement(unittest.TestCase):
         self.assertTrue(all(v.get_x() >= 0 for v in secours))
 
     def test_urgences_distinctes_ne_se_superposent_pas(self):
+        """Exécute le traitement « test urgences distinctes ne se superposent pas »."""
         simulation = Simulation(1600, 900)
         simulation.get_vehicules().clear()
         simulation.creer_urgence("Urgence A", 3, [configuration("droite")])
@@ -63,6 +68,7 @@ class TestSecoursEtEcartement(unittest.TestCase):
         self.assertEqual(len([v for v in simulation.get_vehicules() if isinstance(v, VehiculePrioritaire)]), 2)
 
     def test_retour_sans_avancer_ni_chevaucher(self):
+        """Exécute le traitement « test retour sans avancer ni chevaucher »."""
         simulation = Simulation(1600, 900)
         simulation.get_vehicules().clear()
         devant = Vehicule(300, 500, 3, "droite")
