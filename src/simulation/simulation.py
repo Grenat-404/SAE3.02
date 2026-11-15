@@ -37,6 +37,7 @@ PERIODE_TICK = 0.03
 class ThreadVehicule(threading.Thread):
     """Représente ThreadVehicule dans l'application."""
     def __init__(self, simulation: Simulation, vehicule: Vehicule) -> None:
+        """Initialise l'objet et ses attributs."""
         super().__init__(daemon=True)
         self.__simulation = simulation
         self.__vehicule = vehicule
@@ -61,6 +62,7 @@ class ThreadVehicule(threading.Thread):
 class Simulation:
     """Représente Simulation dans l'application."""
     def __init__(self, largeur_ecran: int, hauteur_ecran: int) -> None:
+        """Initialise l'objet et ses attributs."""
         self.__verrou = threading.RLock()
         self.__threads: dict[Vehicule, ThreadVehicule] = {}
         self.__attente_virage: dict[Vehicule, int] = {}
@@ -127,6 +129,7 @@ class Simulation:
             self.__ajouter_vehicule(Vehicule(pos["x"], pos["y"], 4, direction, destination))
 
     def __ajouter_vehicule(self, vehicule: Vehicule) -> None:
+        """Exécute le traitement « ajouter vehicule »."""
         with self.__verrou:
             self.__vehicules.append(vehicule)
             thread = ThreadVehicule(self, vehicule)
@@ -134,6 +137,7 @@ class Simulation:
             thread.start()
 
     def __arreter_thread(self, vehicule: Vehicule) -> None:
+        """Exécute le traitement « arreter thread »."""
         self.__attente_virage.pop(vehicule, None)
         self.__retenus_entree.discard(vehicule)
         thread = self.__threads.pop(vehicule, None)
@@ -244,6 +248,7 @@ class Simulation:
                     groupe.remove(pieton)
 
     def __vehicule_bloque_par_pieton(self, vehicule: Vehicule, vitesse: float) -> bool:
+        """Exécute le traitement « vehicule bloque par pieton »."""
         if vitesse <= 0:
             return False
         direction = vehicule.get_direction()
@@ -306,6 +311,7 @@ class Simulation:
                 self.__spawn_pos[direction]["y"] = y
 
     def __secours_en_approche_hors_ecran(self, vehicule: Vehicule) -> bool:
+        """Exécute le traitement « secours en approche hors ecran »."""
         if not isinstance(vehicule, VehiculePrioritaire):
             return False
         direction = vehicule.get_direction_initiale()
@@ -335,13 +341,16 @@ class Simulation:
         self.__vehicules = vehicules_a_garder
 
     def __centre(self, v: Vehicule) -> tuple[float, float]:
+        """Exécute le traitement « centre »."""
         return v.get_x() + v.get_largeur() / 2, v.get_y() + v.get_hauteur() / 2
 
     def __placer_centre(self, v: Vehicule, cx: float, cy: float) -> None:
+        """Exécute le traitement « placer centre »."""
         v.set_x(cx - v.get_largeur() / 2)
         v.set_y(cy - v.get_hauteur() / 2)
 
     def __bloque_devant(self, vehicule: Vehicule) -> bool:
+        """Exécute le traitement « bloque devant »."""
         cx, cy = self.__centre(vehicule)
         direction = vehicule.get_direction()
         for autre in self.__vehicules:
@@ -388,6 +397,7 @@ class Simulation:
         return x0, y0, x1, y1
 
     def est_manoeuvre_libre(self, vehicule: Vehicule, direction_cible: str) -> bool:
+        """Exécute le traitement « est manoeuvre libre »."""
         ix, iy = self.__intersection.get_x(), self.__intersection.get_y()
         il, ih = self.__intersection.get_largeur(), self.__intersection.get_hauteur()
         lg = max(vehicule.get_largeur(), vehicule.get_hauteur())
@@ -468,6 +478,7 @@ class Simulation:
         return False
 
     def __route_libre_sortie(self, vehicule: Vehicule) -> bool:
+        """Exécute le traitement « route libre sortie »."""
         xs = self.__parking.get_sortie()[0]
         cy_sortant = self.__centre(vehicule)[1]
         ticks_traversee = abs(self.__y_route_gauche - cy_sortant) / self.__vitesse_sortie
@@ -486,6 +497,7 @@ class Simulation:
         return True
 
     def __autorisation_sortie(self, vehicule: Vehicule) -> bool:
+        """Exécute le traitement « autorisation sortie »."""
         attente = self.__attente_stop_sortie.get(vehicule, self.__duree_stop_sortie)
         if attente > 0:
             self.__attente_stop_sortie[vehicule] = attente - 1
@@ -493,6 +505,7 @@ class Simulation:
         return self.__route_libre_sortie(vehicule)
 
     def __entrer_parking(self, vehicule: Vehicule) -> bool:
+        """Exécute le traitement « entrer parking »."""
         xe = self.__parking.get_entree()[0]
         cx, cy = self.__centre(vehicule)
         if cx > xe:
@@ -513,6 +526,7 @@ class Simulation:
         return True
 
     def __suivre_trajet(self, vehicule: Vehicule) -> None:
+        """Exécute le traitement « suivre trajet »."""
         trajet = vehicule.get_trajet()
         cx, cy = self.__centre(vehicule)
         cible_x, cible_y = trajet[0]
@@ -550,6 +564,7 @@ class Simulation:
         self.__placer_centre(vehicule, cx, cy)
 
     def __gerer_parking(self, vehicule: Vehicule) -> None:
+        """Exécute le traitement « gerer parking »."""
         etat = vehicule.get_etat()
         if etat == "gare":
             vehicule.set_timer(vehicule.get_timer() - 1)
@@ -576,6 +591,7 @@ class Simulation:
 
     # Partie principale : priorité et véhicules d'urgence
     def creer_urgence(self, type_urgence: str, niveau_priorite: int, vehicules: list[VehiculeUrgence]) -> int:
+        """Crée le traitement « creer urgence »."""
         with self.__verrou:
             urgence_id = self.__prochain_id_urgence
             self.__prochain_id_urgence += 1
@@ -588,6 +604,7 @@ class Simulation:
             return urgence_id
 
     def __ajouter_vehicule_prioritaire(self, type_service: str, direction: str, destination: str | None, niveau_priorite: int, type_urgence: str, urgence_id: int, decalage: int) -> None:
+        """Exécute le traitement « ajouter vehicule prioritaire »."""
         if direction not in self.__spawn_pos:
             return
         sens_x, sens_y = {"droite": (-1, 0), "gauche": (1, 0), "bas": (0, -1), "haut": (0, 1)}[direction]
@@ -606,6 +623,7 @@ class Simulation:
         self.__ajouter_vehicule(VehiculePrioritaire(x, y, 4, direction, destination, type_service, niveau_priorite, type_urgence, urgence_id))
 
     def __distance_avant_intersection(self, vehicule: Vehicule) -> float:
+        """Exécute le traitement « distance avant intersection »."""
         ix = self.__intersection.get_x()
         iy = self.__intersection.get_y()
         il = self.__intersection.get_largeur()
@@ -621,6 +639,7 @@ class Simulation:
         return -1
 
     def __vehicule_est_avant_intersection(self, vehicule: Vehicule) -> bool:
+        """Exécute le traitement « vehicule est avant intersection »."""
         return self.__distance_avant_intersection(vehicule) >= 0
 
     def __detecter_demandes_prioritaires(self) -> None:
@@ -720,6 +739,7 @@ class Simulation:
         self.__restaurer_cycle_normal(direction_terminee)
 
     def __feu_de(self, direction: str) -> Feu | None:
+        """Exécute le traitement « feu de »."""
         return {"droite": self.__feu_droite, "gauche": self.__feu_gauche, "bas": self.__feu_bas, "haut": self.__feu_haut}.get(direction)
 
     def __mettre_tous_feux_rouges(self) -> None:
@@ -728,12 +748,14 @@ class Simulation:
             feu.set_etat("rouge")
 
     def __appliquer_feu_prioritaire(self, direction: str) -> None:
+        """Exécute le traitement « appliquer feu prioritaire »."""
         self.__mettre_tous_feux_rouges()
         feu = self.__feu_de(direction)
         if feu is not None:
             feu.set_etat("vert")
 
     def __meme_groupe_prioritaire(self, vehicule: Vehicule) -> bool:
+        """Exécute le traitement « meme groupe prioritaire »."""
         if self.__demande_prioritaire_active is None:
             return False
         if not isinstance(vehicule, VehiculePrioritaire):
@@ -742,6 +764,7 @@ class Simulation:
         return (vehicule.get_urgence_id() == actif.get_urgence_id() and vehicule.get_direction_initiale() == actif.get_direction_initiale())
 
     def __est_prioritaire_actif(self, vehicule: Vehicule) -> bool:
+        """Exécute le traitement « est prioritaire actif »."""
         if self.__etat_priorite != "passage":
             return False
         return self.__meme_groupe_prioritaire(vehicule)
@@ -753,6 +776,7 @@ class Simulation:
         return self.__demande_prioritaire_active["vehicule"].get_direction_initiale()
 
     def __vehicule_prioritaire_a_passe(self, vehicule: Vehicule) -> bool:
+        """Exécute le traitement « vehicule prioritaire a passe »."""
         ix = self.__intersection.get_x()
         iy = self.__intersection.get_y()
         il = self.__intersection.get_largeur()
@@ -777,6 +801,7 @@ class Simulation:
         return True
 
     def __restaurer_cycle_normal(self, direction: str) -> None:
+        """Exécute le traitement « restaurer cycle normal »."""
         horizontal = direction in ("droite", "gauche")
         for feu in (self.__feu_droite, self.__feu_gauche):
             feu.set_etat("vert" if horizontal else "rouge")
@@ -803,6 +828,7 @@ class Simulation:
                 self.__vehicules_ecartes_ce_tick.add(vehicule)
 
     def __urgence_active_derriere(self, vehicule: Vehicule) -> bool:
+        """Exécute le traitement « urgence active derriere »."""
         if self.__demande_prioritaire_active is None or self.__etat_priorite != "passage":
             return False
         direction = vehicule.get_direction()
@@ -836,6 +862,7 @@ class Simulation:
         return False
 
     def __vitesse_deplacement(self, vehicule: Vehicule) -> float:
+        """Exécute le traitement « vitesse deplacement »."""
         if isinstance(vehicule, VehiculePrioritaire):
             return vehicule.get_vitesse()
         if vehicule in self.__vehicules_ecartes_ce_tick:
@@ -878,10 +905,12 @@ class Simulation:
                 self.__time_remaining = 50
 
     def __feu_bloque_direction(self, direction: str) -> bool:
+        """Exécute le traitement « feu bloque direction »."""
         feu = self.__feu_de(direction)
         return True if feu is None else feu.get_etat() in ("rouge", "orange")
 
     def __gerer_arret_feu(self, vehicule: Vehicule, vitesse: float) -> bool:
+        """Exécute le traitement « gerer arret feu »."""
         direction = vehicule.get_direction()
 
         ix = self.__intersection.get_x()
@@ -943,6 +972,7 @@ class Simulation:
         return False
 
     def voie_libre(self, vehicule: Vehicule) -> bool:
+        """Exécute le traitement « voie libre »."""
         seuil = 50
         for autre in self.__vehicules:
             if autre is vehicule:
@@ -982,6 +1012,7 @@ class Simulation:
         return True
 
     def __voie_reservee_pendant_ecartement(self, vehicule: Vehicule, autre: Vehicule) -> bool:
+        """Exécute le traitement « voie reservee pendant ecartement »."""
         if isinstance(vehicule, VehiculePrioritaire) or isinstance(autre, VehiculePrioritaire):
             return False
         if vehicule.get_direction() != autre.get_direction():
@@ -1002,6 +1033,7 @@ class Simulation:
         return lateral < 60 and 0 <= distance <= taille + 10 + vehicule.get_vitesse()
 
     def __cote_clignotant(self, direction: str, destination: str | None) -> str | None:
+        """Exécute le traitement « cote clignotant »."""
         directions = {
             "droite": {"haut": "gauche", "bas": "droite"},
             "gauche": {"bas": "gauche", "haut": "droite"},
@@ -1011,6 +1043,7 @@ class Simulation:
         return directions.get(direction, {}).get(destination)
 
     def __signaler_clignotants(self, vehicule: Vehicule) -> None:
+        """Exécute le traitement « signaler clignotants »."""
         if vehicule.get_destination() is not None:
             distance = self.__distance_avant_intersection(vehicule)
             if 0 <= distance <= 120:
@@ -1022,6 +1055,7 @@ class Simulation:
                 vehicule.activer_clignotant("droite")
 
     def __gerer_direction(self, vehicule: Vehicule) -> bool:
+        """Exécute le traitement « gerer direction »."""
         doit_s_arreter = False
 
         if vehicule.get_direction() == "droite":
@@ -1123,6 +1157,7 @@ class Simulation:
         return doit_s_arreter
 
     def __voiture_devant(self, vehicule: Vehicule) -> bool:
+        """Exécute le traitement « voiture devant »."""
         direction = vehicule.get_direction()
         for autre in self.__vehicules:
             if autre is vehicule:
@@ -1144,6 +1179,7 @@ class Simulation:
         return False
 
     def mettre_a_jour_vehicule(self, vehicule: Vehicule) -> None:
+        """Met à jour le traitement « mettre a jour vehicule »."""
         with self.__verrou:
             if vehicule not in self.__vehicules:
                 return
