@@ -25,19 +25,25 @@ class ObjetDistant:
 
 
 class VehiculeDistant(ObjetDistant):
+    """Représente VehiculeDistant dans l'application."""
     def get_type_service(self) -> str | None:
+        """Récupère le traitement « get type service »."""
         return self._ObjetDistant__valeurs.get("type_service")
 
 
 class ParkingDistant(ObjetDistant):
+    """Représente ParkingDistant dans l'application."""
     def get_voies(self) -> list[ObjetDistant]:
+        """Récupère le traitement « get voies »."""
         return [ObjetDistant(v) for v in self._ObjetDistant__valeurs.get("voies", [])]
 
     def get_places(self) -> list[ObjetDistant]:
+        """Récupère le traitement « get places »."""
         return [ObjetDistant(v) for v in self._ObjetDistant__valeurs.get("places", [])]
 
 
 def etat_vide() -> dict[str, Any]:
+    """Exécute le traitement « etat vide »."""
     return {"routes": [], "intersection": {"x": 0, "y": 0, "largeur": 0, "hauteur": 0},
             "feux": [], "vehicules": [],
             "parking": {"x": 0, "y": 0, "voies": [], "places": [],
@@ -46,6 +52,7 @@ def etat_vide() -> dict[str, Any]:
 
 
 class SimulationDistante(QObject):
+    """Représente SimulationDistante dans l'application."""
     reponse_urgence = pyqtSignal(str)
 
     def __init__(self, largeur: int, hauteur: int) -> None:
@@ -57,6 +64,7 @@ class SimulationDistante(QObject):
         self.__reseau.start()
 
     def arreter(self) -> None:
+        """Arrête le traitement « arreter »."""
         self.__reseau.arreter()
 
     def __recevoir_etat(self, etat: dict[str, Any]) -> None:
@@ -74,23 +82,29 @@ class SimulationDistante(QObject):
 
     # Partie principale : communication ou simulation
     def avancer(self) -> None:
+        """Exécute le traitement « avancer »."""
 
         with self.__verrou:
             self.__etat_affiche = self.__dernier_etat
 
     def get_routes(self) -> list[ObjetDistant]:
+        """Récupère le traitement « get routes »."""
         return [ObjetDistant(v) for v in self.__etat_affiche["routes"]]
 
     def get_feux(self) -> list[ObjetDistant]:
+        """Récupère le traitement « get feux »."""
         return [ObjetDistant(v) for v in self.__etat_affiche["feux"]]
 
     def get_vehicules(self) -> list[Any]:
+        """Récupère le traitement « get vehicules »."""
         return [VehiculeDistant(v) for v in self.__etat_affiche["vehicules"]]
 
     def get_intersections(self) -> ObjetDistant:
+        """Récupère le traitement « get intersections »."""
         return ObjetDistant(self.__etat_affiche["intersection"])
 
     def get_parking(self) -> ParkingDistant:
+        """Récupère le traitement « get parking »."""
         return ParkingDistant(self.__etat_affiche["parking"])
 
     def creer_urgence(self, type_urgence: str, niveau_priorite: int, vehicules: list[VehiculeUrgence]) -> None:
@@ -98,7 +112,9 @@ class SimulationDistante(QObject):
         return None
 
     def reinitialiser(self) -> None:
+        """Réinitialise le traitement « reinitialiser »."""
         self.__reseau.envoyer_reinitialisation()
 
     def get_pietons(self) -> list[dict[str, Any]]:
+        """Récupère le traitement « get pietons »."""
         return self.__etat_affiche.get("pietons", [])
