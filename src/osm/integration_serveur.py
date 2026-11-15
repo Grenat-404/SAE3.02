@@ -24,6 +24,7 @@ class SimulationAvecOSM:
     """Aiguillage entre le carrefour d'origine et le moteur multicarrefours."""
 
     def __init__(self, moteur: MoteurSimulation, largeur: int, hauteur: int) -> None:
+        """Initialise l'objet et ses attributs."""
         self.__verrou = threading.RLock()
         self.__largeur = largeur
         self.__hauteur = hauteur
@@ -130,6 +131,7 @@ class SimulationAvecOSM:
             self.__observer_vehicules()
 
     def creer_urgence(self, type_urgence: str, niveau_priorite: int, vehicules: list[VehiculeUrgence]) -> int:
+        """Crée le traitement « creer urgence »."""
         with self.__verrou:
             identifiant = self.__moteur.creer_urgence(
                 type_urgence, niveau_priorite, vehicules
@@ -193,6 +195,7 @@ class SessionClientAvecOSM(serveur_original.SessionClient):
     """Ajoute une commande au protocole sans réécrire la session TCP."""
 
     def _SessionClient__traiter(self, message: dict[str, Any]) -> None:
+        """Exécute le traitement « SessionClient  traiter »."""
         if message.get("type") != "carte_osm":
             return super()._SessionClient__traiter(message)
 
@@ -223,6 +226,7 @@ class ServeurAvecOSM(serveur_original.ServeurReseau):
         super().__init__()
 
     def initialiser_simulation(self, largeur: int, hauteur: int) -> None:
+        """Exécute le traitement « initialiser simulation »."""
         super().initialiser_simulation(largeur, hauteur)
         with self._ServeurReseau__verrou_simulation:
             simulation = self._ServeurReseau__simulation
@@ -230,6 +234,7 @@ class ServeurAvecOSM(serveur_original.ServeurReseau):
                 self._ServeurReseau__simulation = SimulationAvecOSM(simulation, largeur, hauteur)
 
     def changer_carte_osm(self, carte: str | None, carrefour: str | None) -> None:
+        """Exécute le traitement « changer carte osm »."""
         simulation = self.simulation()
         if not isinstance(simulation, SimulationAvecOSM):
             raise ValueError("Simulation non initialisée")
