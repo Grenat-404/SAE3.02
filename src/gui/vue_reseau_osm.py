@@ -1,6 +1,6 @@
 """Dessin des routes, feux et voitures du nouveau moteur multicarrefours."""
 import math
-from PyQt6.QtCore import QPointF, Qt
+from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QColor, QFont, QPen
 
 COULEURS = {
@@ -54,17 +54,17 @@ def dessiner_reseau_osm(painter, simulation, clignotant_tick):
         }.get(agent.get_service(), agent.get_couleur())
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor(COULEURS.get(nom_couleur, '#aaaaaa')))
-        painter.drawRect(-longueur / 2, -largeur / 2, longueur, largeur)
+        painter.drawRect(QRectF(-longueur / 2, -largeur / 2, longueur, largeur))
         for cote in ('gauche', 'droite'):
             allume = (agent.get_clignotant() == cote and clignotant_tick < 10)
             painter.setBrush(QColor('#ffaa00' if allume else '#c57a13'))
             py = -largeur / 2 if cote == 'gauche' else largeur / 2 - 2
-            painter.drawRect(longueur / 2 - 2, py, 2, 2)
+            painter.drawRect(QRectF(longueur / 2 - 2, py, 2, 2))
         if agent.est_prioritaire():
             painter.setBrush(QColor('#256bfa'))
-            painter.drawRect(-2, -largeur / 2 + 1, 4, 2)
+            painter.drawRect(QRectF(-2, -largeur / 2 + 1, 4, 2))
             painter.setBrush(QColor('#ed3333'))
-            painter.drawRect(-2, largeur / 2 - 3, 4, 2)
+            painter.drawRect(QRectF(-2, largeur / 2 - 3, 4, 2))
         painter.restore()
 
     painter.restore()
