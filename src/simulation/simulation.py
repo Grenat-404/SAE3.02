@@ -17,6 +17,7 @@ from typing import Any, TypedDict, cast
 from src.reseau.protocole import VehiculeUrgence
 
 class PassagePieton(TypedDict):
+    """Représente PassagePieton dans l'application."""
     x: float
     y: float
     largeur: float
@@ -25,6 +26,7 @@ class PassagePieton(TypedDict):
 
 
 class DemandePrioritaire(TypedDict):
+    """Représente DemandePrioritaire dans l'application."""
     vehicule: VehiculePrioritaire
     priorite: int
     ordre: int
@@ -33,6 +35,7 @@ class DemandePrioritaire(TypedDict):
 PERIODE_TICK = 0.03
 
 class ThreadVehicule(threading.Thread):
+    """Représente ThreadVehicule dans l'application."""
     def __init__(self, simulation: Simulation, vehicule: Vehicule) -> None:
         super().__init__(daemon=True)
         self.__simulation = simulation
@@ -40,9 +43,11 @@ class ThreadVehicule(threading.Thread):
         self.__actif = True
 
     def arreter(self) -> None:
+        """Arrête le traitement « arreter »."""
         self.__actif = False
 
     def run(self) -> None:
+        """Exécute le traitement « run »."""
         prochain = time.monotonic()
         while self.__actif:
             self.__simulation.mettre_a_jour_vehicule(self.__vehicule)
@@ -54,6 +59,7 @@ class ThreadVehicule(threading.Thread):
                 prochain = time.monotonic()
 
 class Simulation:
+    """Représente Simulation dans l'application."""
     def __init__(self, largeur_ecran: int, hauteur_ecran: int) -> None:
         self.__verrou = threading.RLock()
         self.__threads: dict[Vehicule, ThreadVehicule] = {}
@@ -135,24 +141,31 @@ class Simulation:
             thread.arreter()
 
     def arreter(self) -> None:
+        """Arrête le traitement « arreter »."""
         with self.__verrou:
             for thread in self.__threads.values():
                 thread.arreter()
             self.__threads.clear()
 
     def get_routes(self) -> list[Route]:
+        """Récupère le traitement « get routes »."""
         return self.__routes
     def get_feux(self) -> list[Feu]:
+        """Récupère le traitement « get feux »."""
         return self.__feux
     def get_vehicules(self) -> list[Vehicule]:
+        """Récupère le traitement « get vehicules »."""
         with self.__verrou:
             return list(self.__vehicules)
     def get_intersections(self) -> Intersection:
+        """Récupère le traitement « get intersections »."""
         return self.__intersection
     def get_parking(self) -> Parking:
+        """Récupère le traitement « get parking »."""
         return self.__parking
 
     def get_pietons(self) -> list[dict[str, Any]]:
+        """Récupère le traitement « get pietons »."""
         with self.__verrou:
             return [ dict(pieton) for groupe in self.__pietons.values() for pieton in groupe ]
 
@@ -185,6 +198,7 @@ class Simulation:
 
     # Partie principale : passages piétons
     def __mettre_a_jour_pietons(self) -> None:
+        """Exécute le traitement « mettre a jour pietons »."""
         maximum_pietons = 1
         frequence = 350
         vitesse = 3
@@ -266,6 +280,7 @@ class Simulation:
         return False
 
     def spawn_vehicles(self) -> None:
+        """Exécute le traitement « spawn vehicles »."""
         if random.randint(1, 30) == 1 and len(self.__vehicules) < 30:
             direction = random.choice(["droite", "gauche", "bas", "haut"])
             vitesse = 3
@@ -308,6 +323,7 @@ class Simulation:
         return False
 
     def despawn_vehicles(self) -> None:
+        """Exécute le traitement « despawn vehicles »."""
         vehicules_a_garder = []
         for vehicule in self.__vehicules:
             dans_ecran = (0 <= vehicule.get_x() <= self.__largeur_ecran
@@ -608,6 +624,7 @@ class Simulation:
         return self.__distance_avant_intersection(vehicule) >= 0
 
     def __detecter_demandes_prioritaires(self) -> None:
+        """Exécute le traitement « detecter demandes prioritaires »."""
         for vehicule in self.__vehicules:
             if not isinstance(vehicule, VehiculePrioritaire):
                 continue
@@ -632,6 +649,7 @@ class Simulation:
         self.__reevaluer_priorite_active()
 
     def __activer_prochaine_priorite(self) -> None:
+        """Exécute le traitement « activer prochaine priorite »."""
         if len(self.__demandes_prioritaires) == 0:
             return
         self.__demandes_prioritaires.sort(key=lambda demande: (-demande["priorite"], demande["ordre"]))
@@ -650,6 +668,7 @@ class Simulation:
         self.__appliquer_feu_prioritaire(direction)
 
     def __reevaluer_priorite_active(self) -> None:
+        """Exécute le traitement « reevaluer priorite active »."""
         if self.__demande_prioritaire_active is None:
             return
         if len(self.__demandes_prioritaires) == 0:
@@ -669,6 +688,7 @@ class Simulation:
         self.__activer_prochaine_priorite()
 
     def __mettre_a_jour_priorite(self) -> None:
+        """Exécute le traitement « mettre a jour priorite »."""
         if self.__demande_prioritaire_active is None:
             return
         vehicule = self.__demande_prioritaire_active["vehicule"]
@@ -688,6 +708,7 @@ class Simulation:
                 self.__terminer_priorite()
 
     def __terminer_priorite(self) -> None:
+        """Exécute le traitement « terminer priorite »."""
         if self.__demande_prioritaire_active is None:
             return
         direction_terminee = self.__demande_prioritaire_active["vehicule"].get_direction_initiale()
@@ -702,6 +723,7 @@ class Simulation:
         return {"droite": self.__feu_droite, "gauche": self.__feu_gauche, "bas": self.__feu_bas, "haut": self.__feu_haut}.get(direction)
 
     def __mettre_tous_feux_rouges(self) -> None:
+        """Exécute le traitement « mettre tous feux rouges »."""
         for feu in self.__feux:
             feu.set_etat("rouge")
 
@@ -725,6 +747,7 @@ class Simulation:
         return self.__meme_groupe_prioritaire(vehicule)
 
     def __direction_prioritaire_active(self) -> str | None:
+        """Exécute le traitement « direction prioritaire active »."""
         if self.__demande_prioritaire_active is None or self.__etat_priorite != "passage":
             return None
         return self.__demande_prioritaire_active["vehicule"].get_direction_initiale()
@@ -746,6 +769,7 @@ class Simulation:
         return False
 
     def __groupe_prioritaire_a_passe(self) -> bool:
+        """Exécute le traitement « groupe prioritaire a passe »."""
         for vehicule in self.__vehicules:
             if self.__meme_groupe_prioritaire(vehicule):
                 if not self.__vehicule_prioritaire_a_passe(vehicule):
@@ -762,6 +786,7 @@ class Simulation:
         self.__time_remaining = 100
 
     def __mettre_a_jour_ecartement_urgence(self) -> None:
+        """Exécute le traitement « mettre a jour ecartement urgence »."""
         self.__vehicules_ecartes_ce_tick.clear()
         for vehicule in self.__vehicules:
             if isinstance(vehicule, VehiculePrioritaire):
@@ -818,6 +843,7 @@ class Simulation:
         return vehicule.get_vitesse()
 
     def feux_sync(self) -> None:
+        """Exécute le traitement « feux sync »."""
         self.__time_remaining -= 1
         if self.__time_remaining <= 0:
             if self.__cycle_state == "horizontal_vert":
@@ -1148,6 +1174,7 @@ class Simulation:
 
     # Partie principale : communication ou simulation
     def avancer(self) -> None:
+        """Exécute le traitement « avancer »."""
         with self.__verrou:
             self.__detecter_demandes_prioritaires()
             if self.__etat_priorite is None:
