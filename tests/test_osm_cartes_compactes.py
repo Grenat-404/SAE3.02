@@ -14,7 +14,9 @@ DOSSIER_CARTES = Path(__file__).resolve().parents[1] / "data" / "maps"
 
 
 class CartesOSMTests(unittest.TestCase):
+    """Représente CartesOSMTests dans l'application."""
     def test_cartes_compactes(self):
+        """Exécute le traitement « test cartes compactes »."""
         for fichier in ("exemple_test.osm", "virage_test.osm", "sens_unique_test.osm"):
             with self.subTest(carte=fichier):
                 chemin = DOSSIER_CARTES / fichier
@@ -27,6 +29,7 @@ class CartesOSMTests(unittest.TestCase):
                     simulation.avancer()
 
     def test_filtrage_carrefours_pour_toutes_les_cartes(self):
+        """Exécute le traitement « test filtrage carrefours pour toutes les cartes »."""
         for fichier in sorted(DOSSIER_CARTES.glob("*.osm")):
             with self.subTest(carte=fichier.name):
                 reseau = ReseauRoutier(str(fichier))
