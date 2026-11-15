@@ -363,6 +363,38 @@ Ce mode correspond au carrefour historique du projet et comprend notamment :
 - véhicules prioritaires ;
 - gestion du passage des secours.
 
+## Régler l'apparition des piétons
+
+Les réglages des piétons du **carrefour prédéfini** se trouvent dans :
+
+```text
+src/simulation/simulation.py
+```
+
+Dans la méthode `__mettre_a_jour_pietons()`, les principales valeurs sont :
+
+```python
+maximum_pietons = 1
+frequence = 350
+vitesse = 3
+```
+
+- `maximum_pietons` définit le nombre maximal de piétons présents **sur chaque passage piéton**. Avec la valeur `1`, il peut donc y avoir au maximum un piéton par passage, soit jusqu'à quatre piétons simultanément sur les quatre passages du carrefour. Pour autoriser deux piétons par passage, utiliser par exemple `maximum_pietons = 2`.
+- `frequence` règle la fréquence d'apparition. À chaque mise à jour, un nouveau piéton a une chance sur cette valeur d'apparaître si le maximum n'est pas atteint. **Une valeur plus petite fait apparaître les piétons plus souvent**, tandis qu'une valeur plus grande les rend plus rares.
+- `vitesse` règle la vitesse de déplacement des piétons pendant leur traversée.
+
+Exemple pour avoir davantage de piétons :
+
+```python
+maximum_pietons = 2
+frequence = 150
+vitesse = 3
+```
+
+Les piétons attendent avant de traverser : ils ne s'engagent que lorsque les feux correspondants sont rouges, qu'aucun véhicule n'occupe le passage et qu'aucune priorité d'urgence n'est active.
+
+---
+
 ## Mode OpenStreetMap
 
 Les cartes sont stockées dans :
