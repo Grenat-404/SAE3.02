@@ -22,6 +22,7 @@ class SessionClient(threading.Thread):
     """Chaque connexion a son tampon d'envoi: aucun socket ne bloque le moteur."""
 
     def __init__(self, serveur: ServeurReseau, connexion: socket.socket, adresse: tuple[str, int]) -> None:
+        """Initialise l'objet et ses attributs."""
         super().__init__(daemon=True)
         self.__serveur = serveur
         self.__socket = connexion
@@ -41,11 +42,13 @@ class SessionClient(threading.Thread):
         self.__socket.close()
 
     def publier(self, trame: bytes) -> None:
+        """Exécute le traitement « publier »."""
         with self.__verrou:
 
             self.__dernier_etat = trame
 
     def __traiter(self, message: dict[str, Any]) -> None:
+        """Exécute le traitement « traiter »."""
         if message.get("type") == "bonjour":
             largeur = message.get("largeur")
             hauteur = message.get("hauteur")
@@ -125,6 +128,7 @@ class SessionClient(threading.Thread):
 class ServeurReseau:
     """Représente ServeurReseau dans l'application."""
     def __init__(self, port_tcp: int = PORT_TCP, port_udp: int = PORT_UDP) -> None:
+        """Initialise l'objet et ses attributs."""
         self.__port_tcp = port_tcp
         self.__port_udp = port_udp
         self.__actif = threading.Event()
@@ -148,6 +152,7 @@ class ServeurReseau:
             return self.__simulation
 
     def initialiser_simulation(self, largeur: int, hauteur: int) -> None:
+        """Exécute le traitement « initialiser simulation »."""
         if type(largeur) is not int or type(hauteur) is not int:
             return
 
@@ -165,6 +170,7 @@ class ServeurReseau:
         self.__reinitialisation_demandee.set()
 
     def retirer_client(self, client: SessionClient) -> None:
+        """Exécute le traitement « retirer client »."""
         with self.__verrou_clients:
             self.__clients.discard(client)
 
