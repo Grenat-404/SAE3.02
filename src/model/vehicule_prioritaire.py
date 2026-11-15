@@ -9,6 +9,7 @@ from src.model.vehicule import Vehicule
 class VehiculePrioritaire(Vehicule):
     """Représente VehiculePrioritaire dans l'application."""
     def __init__(self, x: float, y: float, vitesse: float, direction: str, destination: str | None, type_service: str, niveau_priorite: int, type_urgence: str, urgence_id: int) -> None:
+        """Initialise l'objet et ses attributs."""
         super().__init__(x, y, vitesse, direction, destination)
         self.__direction_initiale = direction
         self.__type_service = type_service
