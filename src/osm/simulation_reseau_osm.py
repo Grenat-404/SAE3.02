@@ -30,42 +30,53 @@ class VoitureReseau:
             self.__distances.append(self.__distances[-1] + math.dist(a, b))
 
     def get_chemin(self) -> list[str]:
+        """Récupère le traitement « get chemin »."""
         return self.__chemin
 
     def get_points(self) -> list[tuple[float, float]]:
+        """Récupère le traitement « get points »."""
         return self.__points
 
     def get_vitesse(self) -> float:
+        """Récupère le traitement « get vitesse »."""
         return self.__vitesse
 
     def get_couleur(self) -> str:
+        """Récupère le traitement « get couleur »."""
         return self.__couleur
 
     def get_service(self) -> str:
+        """Récupère le traitement « get service »."""
         return self.__service
 
     def get_priorite(self) -> int:
+        """Récupère le traitement « get priorite »."""
         return self.__priorite
 
     def get_urgence_id(self) -> int:
+        """Récupère le traitement « get urgence id »."""
         return self.__urgence_id
 
     def get_avancement(self) -> float:
+        """Récupère le traitement « get avancement »."""
         return self.__avancement
 
     def set_avancement(self, valeur: float) -> None:
         self.__avancement = valeur
 
     def get_longueur(self) -> float:
+        """Récupère le traitement « get longueur »."""
         return self.__distances[-1]
 
     def get_clignotant(self) -> str:
+        """Récupère le traitement « get clignotant »."""
         return self.__clignotant
 
     def set_clignotant(self, valeur: str) -> None:
         self.__clignotant = valeur
 
     def get_decalage(self) -> float:
+        """Récupère le traitement « get decalage »."""
         return self.__decalage
 
     def ajuster_decalage(self, cible: float) -> None:
@@ -103,12 +114,14 @@ class VoitureReseau:
             self.__distances.append(self.__distances[-1] + math.dist(a, b))
 
     def est_prioritaire(self) -> bool:
+        """Exécute le traitement « est prioritaire »."""
         return bool(self.__service)
 
     def distance_noeud(self, i: int) -> float:
         return self.__distances[i]
 
     def position(self) -> tuple[float, float, float]:
+        """Exécute le traitement « position »."""
         s = max(0.0, min(self.__avancement, self.get_longueur()))
         for i in range(1, len(self.__points)):
             if s <= self.__distances[i]:
@@ -124,6 +137,7 @@ class VoitureReseau:
 
 
 class SimulationReseauOSM:
+    """Représente SimulationReseauOSM dans l'application."""
     def __init__(self, chemin: str, carrefour_id: str, largeur: int, hauteur: int, graine: int | None = None) -> None:
         self.__reseau = ReseauRoutier(chemin)
         self.__centre_id = str(carrefour_id)
@@ -204,12 +218,15 @@ class SimulationReseauOSM:
             self.__apparition()
 
     def get_vehicules(self) -> list[VoitureReseau]:
+        """Récupère le traitement « get vehicules »."""
         return self.__agents
 
     def get_dessin(self) -> dict[str, Any]:
+        """Récupère le traitement « get dessin »."""
         return self.__dessin
 
     def __construire_dessin(self) -> dict[str, Any]:
+        """Exécute le traitement « construire dessin »."""
         segments = []
         for a, b in self.__reseau.get_segments():
             p, q = self.__positions[a], self.__positions[b]
@@ -433,6 +450,7 @@ class SimulationReseauOSM:
         return True
 
     def __apparition(self) -> None:
+        """Exécute le traitement « apparition »."""
         if len(self.__agents) >= 125:
             return
         chemin = self.__choisir_itineraire()
@@ -773,6 +791,7 @@ class SimulationReseauOSM:
 
     # Partie principale : évolution du trafic
     def avancer(self) -> None:
+        """Exécute le traitement « avancer »."""
         self.__tick += 1
         self.__attente_de.clear()
 
