@@ -16,6 +16,7 @@ from src.reseau.protocole import (PORT_TCP, PORT_UDP, SIGNATURE, GROUPE_MULTICAS
                                   TAILLE_MAXIMALE, encoder, decoder)
 
 class ClientReseau(threading.Thread):
+    """Représente ClientReseau dans l'application."""
     def __init__(self, largeur: int, hauteur: int, recevoir_etat: Callable[[dict[str, Any]], None], recevoir_reponse: Callable[[dict[str, Any]], None], port_tcp: int = PORT_TCP, port_udp: int = PORT_UDP) -> None:
         super().__init__(daemon=True)
         self.__largeur = largeur
@@ -33,10 +34,12 @@ class ClientReseau(threading.Thread):
         self.__verrou = threading.Lock()
 
     def connecte(self) -> bool:
+        """Établit le traitement « connecte »."""
         return self.__connecte.is_set()
 
     # Partie principale : communication ou simulation
     def arreter(self) -> None:
+        """Arrête le traitement « arreter »."""
         self.__actif.clear()
         self.__connecte.clear()
         if self.__socket is not None:
@@ -59,11 +62,13 @@ class ClientReseau(threading.Thread):
         return numero
 
     def envoyer_reinitialisation(self) -> None:
+        """Exécute le traitement « envoyer reinitialisation »."""
         if not self.connecte():
             raise ConnectionError("Serveur non connecté")
         self.__a_envoyer.put({"type": "reinitialiser"})
 
     def __decouvrir(self) -> tuple[str, int] | None:
+        """Exécute le traitement « decouvrir »."""
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp:
             udp.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             udp.bind(("0.0.0.0", 0))
@@ -144,6 +149,7 @@ class ClientReseau(threading.Thread):
 
     # Partie principale : communication ou simulation
     def run(self) -> None:
+        """Exécute le traitement « run »."""
         while self.__actif.is_set():
             try:
                 adresse = self.__decouvrir()
