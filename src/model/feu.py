@@ -8,6 +8,7 @@ from __future__ import annotations
 class Feu:
     """Représente Feu dans l'application."""
     def __init__(self, x: int, y: int, etat: str = "rouge", orientation: str = "vertical", inverse: bool = False) -> None:
+        """Initialise l'objet et ses attributs."""
         self.__x = x
         self.__y = y
         self.__etat = etat
@@ -27,6 +28,7 @@ class Feu:
         return self.__etat
 
     def set_etat(self, etat: str) -> None:
+        """Définit le traitement « set etat »."""
         self.__etat = etat
 
     def get_orientation(self) -> str:
