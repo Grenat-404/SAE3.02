@@ -230,7 +230,7 @@ Pour afficher l'aide :
 python lancer_osm.py --help
 ```
 
-Le serveur doit être lancé avant le client.
+Il est recommandé de lancer le serveur avant le client. Si le client est lancé en premier, il continue sa recherche jusqu'à ce que le serveur soit disponible.
 
 ---
 
