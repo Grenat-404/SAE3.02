@@ -145,6 +145,17 @@ class SimulationReseauOSM:
                 "les véhicules hors écran. Télécharge une zone de 1 à 2 km."
             )
 
+        # Favoriser les véhicules qui entrent près de la zone visible :
+        # auparavant, une grande partie du trafic roulait hors écran.
+        self.__entrees_proches = []
+        if not self.__carte_compacte:
+            for noeud in self.__entrees:
+                x, y = self.__positions[noeud]
+                hors_x = max(0, -x, x - self.__limite_droite)
+                hors_y = max(0, 100 - y, y - self.__hauteur)
+                if max(hors_x, hors_y) <= 115:
+                    self.__entrees_proches.append(noeud)
+
         # On vérifie qu'au moins un chemin atteignable traverse une intersection.
         if not self.__choisir_itineraire():
             raise ValueError(
@@ -152,7 +163,7 @@ class SimulationReseauOSM:
                 'et passant par une intersection. Essaie une zone plus grande.'
             )
         self.__dessin = self.__construire_dessin()
-        for _ in range(12):
+        for _ in range(22):
             self.__apparition()
 
     def get_vehicules(self):
@@ -220,6 +231,9 @@ class SimulationReseauOSM:
 
     def __choisir_itineraire(self, provenance=None, urgence=False, souhaite=None):
         candidats = self.__entrees
+        if (not urgence and self.__entrees_proches
+                and self.__generateur.random() < 0.85):
+            candidats = self.__entrees_proches
         if provenance in ('droite', 'gauche', 'bas', 'haut'):
             # Provenance = côté par lequel la voiture entre dans la zone.
             cx, cy = self.__positions[self.__centre_id]
@@ -296,12 +310,12 @@ class SimulationReseauOSM:
         x, y, _ = voiture.position()
         for autre in self.__agents:
             ax, ay, _ = autre.position()
-            if math.hypot(x - ax, y - ay) < 40:
+            if math.hypot(x - ax, y - ay) < 31:
                 return False
         return True
 
     def __apparition(self):
-        if len(self.__agents) >= 80:
+        if len(self.__agents) >= 125:
             return
         chemin = self.__choisir_itineraire()
         if chemin:
@@ -346,7 +360,7 @@ class SimulationReseauOSM:
         centre = voiture.distance_noeud(indice)
         ancien = voiture.get_avancement()
         # Tester un point situé juste après l'intersection.
-        voiture.set_avancement(min(centre + 38, voiture.get_longueur()))
+        voiture.set_avancement(min(centre + 32, voiture.get_longueur()))
         x, y, angle = voiture.position()
         voiture.set_avancement(ancien)
         ux, uy = math.cos(angle), math.sin(angle)
@@ -363,7 +377,7 @@ class SimulationReseauOSM:
                 continue
             longitudinal = dx * ux + dy * uy
             lateral = abs(dx * uy - dy * ux)
-            if -22 < longitudinal < 32 and lateral < 12:
+            if -18 < longitudinal < 27 and lateral < 9:
                 self.__attente_de[voiture] = autre
                 return False
 
@@ -372,7 +386,7 @@ class SimulationReseauOSM:
         chemin = voiture.get_chemin()
         for j in range(indice + 1, len(chemin) - 1):
             distance = voiture.distance_noeud(j) - centre
-            if distance > 65:
+            if distance > 48:
                 break
             suivant = chemin[j]
             if suivant not in self.__intersections:
@@ -381,7 +395,7 @@ class SimulationReseauOSM:
             if reserve is not None and reserve is not voiture:
                 self.__attente_de[voiture] = reserve
                 return False
-            if (not voiture.est_prioritaire()
+            if (distance < 35 and not voiture.est_prioritaire()
                     and self.__reseau.a_feu_osm(suivant)
                     and self.get_etat_feu(suivant, chemin[j - 1]) != 'vert'):
                 return False
@@ -419,7 +433,9 @@ class SimulationReseauOSM:
                 continue
             devant = dx * ux + dy * uy
             lateral = abs(dx * uy - dy * ux)
-            if -5 < devant < 32 and lateral < 11:
+            # Véhicules OSM plus petits : espacement réduit et exclusion
+            # des voitures roulant sur une voie parallèle.
+            if -4 < devant < 25 and lateral < 8:
                 self.__attente_de[voiture] = autre
                 return False
         return True
@@ -492,7 +508,7 @@ class SimulationReseauOSM:
         arretes = sum(self.__immobilisation.get(v, 0) > 80
                       for v in self.__agents)
         taux = arretes / max(1, len(self.__agents))
-        frequence = 0.06 if taux < 0.35 else (0.012 if taux < 0.60 else 0.0)
+        frequence = 0.095 if taux < 0.35 else (0.035 if taux < 0.60 else 0.008)
         if self.__generateur.random() < frequence:
             self.__apparition()
         for agent in list(self.__urgences_attente):

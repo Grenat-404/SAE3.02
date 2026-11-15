@@ -46,24 +46,25 @@ def dessiner_reseau_osm(painter, simulation, clignotant_tick):
         painter.translate(x, y)
         painter.rotate(math.degrees(angle))
         char = agent.get_service() == 'char'
-        longueur, largeur = (42, 23) if char else (25, 14)
+        # Dimensions plus petites uniquement dans le mode OSM.
+        longueur, largeur = (32, 17) if char else (19, 10)
         nom_couleur = {
             'ambulance': 'white', 'pompier': 'red',
             'police': 'blue', 'char': 'darkGreen'
         }.get(agent.get_service(), agent.get_couleur())
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor(COULEURS.get(nom_couleur, '#aaaaaa')))
-        painter.drawRect(-longueur//2, -largeur//2, longueur, largeur)
+        painter.drawRect(-longueur / 2, -largeur / 2, longueur, largeur)
         for cote in ('gauche', 'droite'):
             allume = (agent.get_clignotant() == cote and clignotant_tick < 10)
             painter.setBrush(QColor('#ffaa00' if allume else '#c57a13'))
-            py = -largeur//2 if cote == 'gauche' else largeur//2-3
-            painter.drawRect(longueur//2-3, py, 3, 3)
+            py = -largeur / 2 if cote == 'gauche' else largeur / 2 - 2
+            painter.drawRect(longueur / 2 - 2, py, 2, 2)
         if agent.est_prioritaire():
             painter.setBrush(QColor('#256bfa'))
-            painter.drawRect(-2, -largeur//2+2, 4, 3)
+            painter.drawRect(-2, -largeur / 2 + 1, 4, 2)
             painter.setBrush(QColor('#ed3333'))
-            painter.drawRect(-2, largeur//2-5, 4, 3)
+            painter.drawRect(-2, largeur / 2 - 3, 4, 2)
         painter.restore()
 
     painter.restore()

@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 from src.osm.reseau_routier import ReseauRoutier
-from src.osm.simulation_reseau_osm import SimulationReseauOSM
+from src.osm.simulation_reseau_osm import SimulationReseauOSM, VoitureReseau
 
 CARTES = Path(__file__).resolve().parents[1] / "data" / "maps"
 
@@ -18,7 +18,20 @@ class SimulationAntibouchonTests(unittest.TestCase):
         sim = self.simulation()
         for _ in range(600):
             sim.avancer()
-            self.assertLessEqual(len(sim.get_vehicules()), 80)
+            self.assertLessEqual(len(sim.get_vehicules()), 125)
+
+    def test_file_plus_serree_sans_superposition(self):
+        sim = self.simulation()
+        arriere = VoitureReseau(["1", "2"], [(0, 0), (400, 0)], 2.5, "green")
+        avant = VoitureReseau(["1", "2"], [(0, 0), (400, 0)], 2.5, "yellow")
+        arriere.set_avancement(100)
+        avant.set_avancement(125)
+        sim._SimulationReseauOSM__agents = [arriere, avant]
+        # À 22,5 pixels de centre-à-centre, l'arrière attend.
+        self.assertFalse(sim._SimulationReseauOSM__route_libre(arriere, 102.5))
+        # À 37,5 pixels, l'arrière doit pouvoir avancer.
+        avant.set_avancement(140)
+        self.assertTrue(sim._SimulationReseauOSM__route_libre(arriere, 102.5))
 
     def test_recuperation_un_seul_vehicule(self):
         sim = self.simulation()
