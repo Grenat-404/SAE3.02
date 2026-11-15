@@ -24,6 +24,7 @@ class VehiculeDistantOSM:
     """Même interface de dessin que VoitureReseau, avec des données JSON."""
 
     def __init__(self, donnees: EtatVehiculeOSM) -> None:
+        """Initialise l'objet et ses attributs."""
         self.__donnees = donnees
 
     def position(self) -> tuple[float, float, float]:
@@ -50,6 +51,7 @@ class VehiculeDistantOSM:
 class SimulationDistanteAvecOSM(SimulationDistante):
     """Représente SimulationDistanteAvecOSM dans l'application."""
     def __init__(self, largeur: int, hauteur: int) -> None:
+        """Initialise l'objet et ses attributs."""
         self.__selection: str | None = None
         self.__dessin: dict[str, Any] | None = None
         super().__init__(largeur, hauteur)
@@ -107,11 +109,13 @@ class SimulationDistanteAvecOSM(SimulationDistante):
         return super().get_vehicules()
 
     def get_etat_feu(self, noeud: str, precedent: str) -> str:
+        """Récupère le traitement « get etat feu »."""
         cle = str(noeud) + "|" + str(precedent)
         return self._SimulationDistante__etat_affiche.get("feux_osm", {}).get(cle, "rouge")
 
     # Partie principale : traitement principal
     def choisir_carte(self, carrefour: dict[str, Any] | None) -> None:
+        """Exécute le traitement « choisir carte »."""
         reseau = self._SimulationDistante__reseau
         if not reseau.connecte():
             raise ConnectionError("Serveur non connecté : réessayer après connexion")
@@ -131,6 +135,7 @@ class SimulationDistanteAvecOSM(SimulationDistante):
 class InterfaceAvecOSM(Interface):
     """Représente InterfaceAvecOSM dans l'application."""
     def __init__(self, simulation: SimulationDistanteAvecOSM) -> None:
+        """Initialise l'objet et ses attributs."""
         super().__init__(simulation)
         self.simulation: SimulationDistanteAvecOSM = simulation
         self.__selecteur = SelecteurOSM(self)
@@ -140,6 +145,7 @@ class InterfaceAvecOSM(Interface):
         self.__selecteur.raise_()
 
     def __charger_carte(self, carrefour: dict[str, Any] | None) -> None:
+        """Exécute le traitement « charger carte »."""
         try:
             self.simulation.choisir_carte(carrefour)
         except (ConnectionError, KeyError, ValueError) as erreur:
@@ -177,6 +183,7 @@ class InterfaceAvecOSM(Interface):
 
     # Partie principale : traitement principal
     def paintEvent(self, event: QPaintEvent) -> None:
+        """Affiche le traitement « paintEvent »."""
         if self.simulation.get_mode() != "osm":
             return super().paintEvent(event)
         painter = QPainter(self)
