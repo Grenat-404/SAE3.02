@@ -5,6 +5,7 @@ toujours calculés par la VM serveur.
 """
 import base64
 import json
+import socket
 import zlib
 
 from PyQt6.QtGui import QPainter
@@ -44,6 +45,24 @@ class SimulationDistanteAvecOSM(SimulationDistante):
         self.__selection = None
         self.__dessin = None
         super().__init__(largeur, hauteur)
+
+    def arreter(self):
+        """Fermer sans erreur si le thread réseau se déconnecte en parallèle."""
+        reseau = self._SimulationDistante__reseau
+        reseau._ClientReseau__actif.clear()
+        reseau._ClientReseau__connecte.clear()
+        # Conserver une référence locale : le thread peut mettre __socket à
+        # None pendant la fermeture. Les fichiers réseau originaux restent intacts.
+        connexion = reseau._ClientReseau__socket
+        if connexion is not None:
+            try:
+                connexion.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            try:
+                connexion.close()
+            except OSError:
+                pass
 
     def avancer(self):
         super().avancer()

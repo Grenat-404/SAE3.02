@@ -99,6 +99,8 @@ class SimulationReseauOSM:
         self.__couleurs = ['green', 'yellow', 'cyan', 'magenta',
                            'darkCyan', 'darkMagenta', 'darkYellow']
         self.__intersections = self.__reseau.get_intersections()
+        # Les petites cartes de test n'ont pas de routes qui dépassent l'écran.
+        self.__carte_compacte = len(self.__reseau.get_noeuds()) <= 20
         self.__reservations = {}       # noeud -> véhicule engagé
         self.__urgences_noeud = {}     # noeud -> urgence ayant priorité
         self.__generateur = random.Random(graine)
@@ -123,6 +125,17 @@ class SimulationReseauOSM:
                     self.__entrees.append(n)
                 if n in entrants:
                     self.__sorties.append(n)
+
+        if self.__carte_compacte:
+            # Sur les petites cartes, utiliser les extrémités des routes comme
+            # départs/arrivées, même lorsqu'elles sont visibles à l'écran.
+            voisins = {}
+            for a, b in self.__reseau.get_segments():
+                voisins.setdefault(a, set()).add(b)
+                voisins.setdefault(b, set()).add(a)
+            extremites = [n for n, proches in voisins.items() if len(proches) == 1]
+            self.__entrees = [n for n in extremites if graphe[n]]
+            self.__sorties = [n for n in extremites if n in entrants]
 
         if not self.__entrees or not self.__sorties:
             raise ValueError(
@@ -242,12 +255,16 @@ class SimulationReseauOSM:
                 chemin = self.__reseau.itineraire_aleatoire(
                     debut, fin, self.__generateur
                 )
-            if not chemin or len(chemin) < 5:
+            if not chemin or len(chemin) < (3 if self.__carte_compacte else 5):
                 continue
             longueur = sum(math.dist(self.__positions[x], self.__positions[y])
                            for x, y in zip(chemin, chemin[1:]))
             nb_intersections = sum(n in self.__intersections for n in chemin[1:-1])
-            if longueur <= 250 or nb_intersections < (1 if urgence else 2):
+            # Les tests pédagogiques ont parfois une seule intersection
+            # et des trajets courts. Garder les critères de la ville inchangés.
+            longueur_min = 20 if self.__carte_compacte else 250
+            intersections_min = 1 if self.__carte_compacte or urgence else 2
+            if longueur <= longueur_min or nb_intersections < intersections_min:
                 continue
             if urgence and souhaite in ('droite', 'gauche', 'haut', 'bas'):
                 i = chemin.index(self.__centre_id)
