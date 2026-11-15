@@ -12,7 +12,9 @@ from src.simulation.simulation import Simulation
 
 
 class IntegrationUrgencesTest(unittest.TestCase):
+    """Représente IntegrationUrgencesTest dans l'application."""
     def test_decalage_perpendiculaire(self):
+        """Exécute le traitement « test decalage perpendiculaire »."""
         vehicule = Vehicule(10, 20, 4, "droite")
         vehicule.commencer_ecartement_urgence()
         vehicule.mettre_a_jour_ecartement()
@@ -24,6 +26,7 @@ class IntegrationUrgencesTest(unittest.TestCase):
         self.assertEqual(vehicule.get_y(), 20)
 
     def test_char_assaut(self):
+        """Exécute le traitement « test char assaut »."""
         char = VehiculePrioritaire(10, 20, 4, "droite", "haut", "char", 4, "Intervention", 1)
         self.assertEqual(char.get_couleur(), "darkGreen")
         self.assertEqual(char.get_dimensions(), (50, 32))
@@ -31,6 +34,7 @@ class IntegrationUrgencesTest(unittest.TestCase):
         self.assertEqual(char.get_destination(), "haut")
 
     def test_groupe_prioritaire_et_file(self):
+        """Exécute le traitement « test groupe prioritaire et file »."""
         simulation = Simulation(1600, 900)
         simulation.creer_urgence("Intervention", 3, [
             {"service": "police", "direction": "droite", "destination": None},
@@ -58,6 +62,7 @@ class IntegrationUrgencesTest(unittest.TestCase):
         self.assertEqual(len(simulation._Simulation__demandes_prioritaires), 1)
 
     def test_clignotant_virage(self):
+        """Exécute le traitement « test clignotant virage »."""
         simulation = Simulation(1600, 900)
         vehicule = simulation.get_vehicules()[0]
         vehicule.set_destination("haut")
