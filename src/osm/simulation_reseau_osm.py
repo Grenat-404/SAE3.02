@@ -14,6 +14,7 @@ from src.osm.reseau_routier import ReseauRoutier
 class VoitureReseau:
     """Véhicule qui suit un chemin de nœuds OSM ; attributs privés."""
     def __init__(self, chemin: list[str], points: list[tuple[float, float]], vitesse: float, couleur: str, service: str = '', priorite: int = 0, urgence_id: int = 0) -> None:
+        """Initialise l'objet et ses attributs."""
         self.__chemin = chemin
         self.__points = points
         self.__vitesse = vitesse
@@ -62,6 +63,7 @@ class VoitureReseau:
         return self.__avancement
 
     def set_avancement(self, valeur: float) -> None:
+        """Définit le traitement « set avancement »."""
         self.__avancement = valeur
 
     def get_longueur(self) -> float:
@@ -73,6 +75,7 @@ class VoitureReseau:
         return self.__clignotant
 
     def set_clignotant(self, valeur: str) -> None:
+        """Définit le traitement « set clignotant »."""
         self.__clignotant = valeur
 
     def get_decalage(self) -> float:
@@ -118,6 +121,7 @@ class VoitureReseau:
         return bool(self.__service)
 
     def distance_noeud(self, i: int) -> float:
+        """Exécute le traitement « distance noeud »."""
         return self.__distances[i]
 
     def position(self) -> tuple[float, float, float]:
@@ -139,6 +143,7 @@ class VoitureReseau:
 class SimulationReseauOSM:
     """Représente SimulationReseauOSM dans l'application."""
     def __init__(self, chemin: str, carrefour_id: str, largeur: int, hauteur: int, graine: int | None = None) -> None:
+        """Initialise l'objet et ses attributs."""
         self.__reseau = ReseauRoutier(chemin)
         self.__centre_id = str(carrefour_id)
         self.__positions, self.__limite_droite = self.__reseau.projeter(str(carrefour_id), largeur, hauteur)
@@ -338,6 +343,7 @@ class SimulationReseauOSM:
         angle_sortie = angles_sortie.get(direction_sortie)
 
         def ecart_angle(noeud: str, angle: float | None) -> float:
+            """Exécute le traitement « ecart angle »."""
             if angle is None:
                 return 0.0
             x, y = self.__positions[noeud]
@@ -404,6 +410,7 @@ class SimulationReseauOSM:
 
     # Partie principale : traitement principal
     def __choisir_itineraire(self, provenance: str | None = None, urgence: bool = False, souhaite: str | None = None) -> list[str] | None:
+        """Exécute le traitement « choisir itineraire »."""
         if urgence:
             return self.__itineraire_urgence_fixe(provenance, souhaite)
 
@@ -433,6 +440,7 @@ class SimulationReseauOSM:
         return None
 
     def __nouvelle_voiture(self, chemin: list[str], service: str = '', priorite: int = 0, urgence_id: int = 0) -> VoitureReseau:
+        """Exécute le traitement « nouvelle voiture »."""
         points = [self.__positions[n] for n in chemin]
         voiture = VoitureReseau(
             chemin, points, 3.4 if service else self.__generateur.uniform(2.0, 3.0),
@@ -442,6 +450,7 @@ class SimulationReseauOSM:
         return voiture
 
     def __depart_libre(self, voiture: VoitureReseau) -> bool:
+        """Exécute le traitement « depart libre »."""
         x, y, _ = voiture.position()
         for autre in self.__agents:
             ax, ay, _ = autre.position()
