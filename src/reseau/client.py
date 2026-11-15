@@ -1,4 +1,8 @@
-"""Client TCP dans un thread distinct: les widgets Qt ne sont jamais bloqués."""
+# ---------------------------------------------------------------------------
+# SAÉ 3.02 | src/reseau/client.py
+# Client TCP avec découverte automatique du serveur sur le réseau local.
+# Reçoit les états de simulation et envoie les commandes d'urgence.
+# ---------------------------------------------------------------------------
 import queue
 import select
 import socket
@@ -10,8 +14,7 @@ from src.reseau.protocole import (PORT_TCP, PORT_UDP, SIGNATURE, GROUPE_MULTICAS
 
 
 class ClientReseau(threading.Thread):
-    def __init__(self, largeur, hauteur, recevoir_etat, recevoir_reponse,
-                 port_tcp=PORT_TCP, port_udp=PORT_UDP):
+    def __init__(self, largeur, hauteur, recevoir_etat, recevoir_reponse, port_tcp=PORT_TCP, port_udp=PORT_UDP):
         super().__init__(daemon=True)
         self.__largeur = largeur
         self.__hauteur = hauteur
@@ -30,6 +33,7 @@ class ClientReseau(threading.Thread):
     def connecte(self):
         return self.__connecte.is_set()
 
+    # Partie principale : communication ou simulation
     def arreter(self):
         self.__actif.clear()
         self.__connecte.clear()
@@ -59,7 +63,7 @@ class ClientReseau(threading.Thread):
         self.__a_envoyer.put({"type": "reinitialiser"})
 
     def __decouvrir(self):
-        # L'adresse réelle est récupérée depuis l'expéditeur de la réponse UDP.
+
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp:
             udp.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             udp.bind(("0.0.0.0", 0))
@@ -90,8 +94,7 @@ class ClientReseau(threading.Thread):
         self.__socket = tcp
         tcp.setblocking(False)
         tampon_reception = bytearray()
-        tampon_envoi = encoder({"type": "bonjour", "largeur": self.__largeur,
-                                 "hauteur": self.__hauteur})
+        tampon_envoi = encoder({"type": "bonjour", "largeur": self.__largeur, "hauteur": self.__hauteur})
         self.__connecte.set()
         print(f"[CLIENT] Connecté à {adresse[0]}:{adresse[1]}", flush=True)
         try:
@@ -101,9 +104,7 @@ class ClientReseau(threading.Thread):
                         tampon_envoi = encoder(self.__a_envoyer.get_nowait())
                     except queue.Empty:
                         pass
-                lecture, ecriture, _ = select.select(
-                    [tcp], [tcp] if tampon_envoi else [], [], 0.02
-                )
+                lecture, ecriture, _ = select.select([tcp], [tcp] if tampon_envoi else [], [], 0.02)
                 if ecriture:
                     longueur = tcp.send(tampon_envoi)
                     if longueur <= 0:
@@ -141,6 +142,7 @@ class ClientReseau(threading.Thread):
                                         "erreur": "Connexion au serveur interrompue"})
                 print("[CLIENT] Déconnecté, recherche automatique...", flush=True)
 
+    # Partie principale : communication ou simulation
     def run(self):
         while self.__actif.is_set():
             try:

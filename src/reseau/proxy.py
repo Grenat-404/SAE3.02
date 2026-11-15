@@ -1,3 +1,8 @@
+# ---------------------------------------------------------------------------
+# SAÉ 3.02 | src/reseau/proxy.py
+# Interface distante exposant l'état reçu comme des objets Qt.
+# Permet à la fenêtre classique de fonctionner sans simulation locale.
+# ---------------------------------------------------------------------------
 import threading
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -46,9 +51,7 @@ class SimulationDistante(QObject):
         self.__verrou = threading.Lock()
         self.__dernier_etat = etat_vide()
         self.__etat_affiche = self.__dernier_etat
-        self.__reseau = ClientReseau(
-            largeur, hauteur, self.__recevoir_etat, self.__recevoir_reponse
-        )
+        self.__reseau = ClientReseau(largeur, hauteur, self.__recevoir_etat, self.__recevoir_reponse)
         self.__reseau.start()
 
     def arreter(self):
@@ -67,9 +70,10 @@ class SimulationDistante(QObject):
         else:
             self.reponse_urgence.emit("Erreur serveur : " + str(message.get("erreur", "inconnue")))
 
+    # Partie principale : communication ou simulation
     def avancer(self):
-        # L'ancienne GUI appelle avancer() toutes les 30 ms.
-        # Ici, on fige seulement le dernier instantané reçu: aucun calcul de circulation.
+
+
         with self.__verrou:
             self.__etat_affiche = self.__dernier_etat
 

@@ -1,4 +1,8 @@
-"""Protocole TCP JSON par lignes. Aucun framework réseau externe."""
+# ---------------------------------------------------------------------------
+# SAÉ 3.02 | src/reseau/protocole.py
+# Constantes et validation du protocole TCP/UDP du projet.
+# Sérialise les messages JSON et vérifie les urgences.
+# ---------------------------------------------------------------------------
 import json
 
 PORT_TCP = 5050
@@ -21,6 +25,7 @@ def decoder(ligne):
     return message
 
 
+# Partie principale : priorité et véhicules d'urgence
 def verifier_urgence(message):
     """Valider les valeurs AVANT l'appel au moteur original."""
     urgence = message.get("type_urgence")

@@ -1,4 +1,9 @@
-"""Tests sans PyQt pour les petites cartes OSM du projet."""
+# ---------------------------------------------------------------------------
+# SAÉ 3.02 | tests/test_osm_cartes_compactes.py
+# Tests des cartes OSM de démonstration et de petite taille.
+# Vérifie le chargement et la sélection des centres.
+# ---------------------------------------------------------------------------
+
 import unittest
 from pathlib import Path
 
@@ -17,9 +22,7 @@ class CartesOSMTests(unittest.TestCase):
                 reseau = ReseauRoutier(str(chemin))
                 carrefours = reseau.carrefours()
                 self.assertTrue(carrefours, "Aucun centre proposé")
-                simulation = SimulationReseauOSM(
-                    str(chemin), carrefours[0]["id"], 1440, 900, graine=5
-                )
+                simulation = SimulationReseauOSM(str(chemin), carrefours[0]["id"], 1440, 900, graine=5)
                 self.assertTrue(simulation.get_dessin()["segments"])
                 for _ in range(20):
                     simulation.avancer()
@@ -32,10 +35,7 @@ class CartesOSMTests(unittest.TestCase):
                 self.assertTrue(centres)
                 for i, premier in enumerate(centres):
                     for autre in centres[i + 1:]:
-                        self.assertGreaterEqual(
-                            reseau.distance_metres(premier["id"], autre["id"]),
-                            75 - 0.0001,
-                        )
+                        self.assertGreaterEqual(reseau.distance_metres(premier["id"], autre["id"]), 75 - 0.0001,)
 
 
 if __name__ == "__main__":

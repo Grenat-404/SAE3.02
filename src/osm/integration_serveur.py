@@ -1,8 +1,8 @@
-"""Adaptateur OSM pour le serveur historique, sans toucher à src/reseau/.
-
-Le serveur original garde son TCP, sa découverte UDP et son traitement des
-urgences. Seule une commande supplémentaire (carte_osm) change le moteur actif.
-"""
+# ---------------------------------------------------------------------------
+# SAÉ 3.02 | src/osm/integration_serveur.py
+# Adaptateur serveur pour alterner simulation classique et cartes OSM.
+# Conserve les sockets existants, pilote le moteur OSM côté serveur.
+# ---------------------------------------------------------------------------
 import base64
 import json
 import re
@@ -31,6 +31,7 @@ class SimulationAvecOSM:
         self.__plan_zip = None
         self.__numero_image = 0
 
+    # Partie principale : traitement principal
     def changer_carte(self, carte, centre):
         """Charge une nouvelle simulation, sans détruire la précédente si échec."""
         with self.__verrou:
@@ -40,8 +41,7 @@ class SimulationAvecOSM:
                 plan_zip = None
                 selection = "classique"
             else:
-                if (type(carte) is not str
-                        or not re.fullmatch(r"[A-Za-z0-9_-]+\.osm", carte)):
+                if (type(carte) is not str or not re.fullmatch(r"[A-Za-z0-9_-]+\.osm", carte)):
                     raise ValueError("Nom de carte OSM invalide")
                 if centre is None or not re.fullmatch(r"-?[0-9]+", str(centre)):
                     raise ValueError("Identifiant de carrefour invalide")
@@ -49,12 +49,9 @@ class SimulationAvecOSM:
                 chemin = dossier / carte
                 if not chemin.is_file():
                     raise ValueError("Carte absente du serveur : " + carte)
-                nouveau = SimulationReseauOSM(
-                    str(chemin), str(centre), self.__largeur, self.__hauteur
-                )
+                nouveau = SimulationReseauOSM(str(chemin), str(centre), self.__largeur, self.__hauteur)
                 plan = nouveau.get_dessin()
-                plan_json = json.dumps(plan, ensure_ascii=False,
-                                      separators=(",", ":")).encode("utf-8")
+                plan_json = json.dumps(plan, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
                 plan_zip = base64.b64encode(zlib.compress(plan_json, 3)).decode("ascii")
                 selection = carte + ":" + str(centre)
 
@@ -80,14 +77,13 @@ class SimulationAvecOSM:
 
     def creer_urgence(self, type_urgence, niveau_priorite, vehicules):
         with self.__verrou:
-            return self.__moteur.creer_urgence(
-                type_urgence, niveau_priorite, vehicules
-            )
+            return self.__moteur.creer_urgence(type_urgence, niveau_priorite, vehicules)
 
+    # Partie principale : traitement principal
     def exporter_etat_reseau(self):
         with self.__verrou:
             if self.__carte is None:
-                # La sérialisation existante et toutes ses données sont préservées.
+
                 etat = self.__moteur.exporter_etat_reseau()
                 etat["mode"] = "classique"
                 return etat
@@ -115,8 +111,8 @@ class SimulationAvecOSM:
                 "agents_osm": vehicules,
                 "feux_osm": feux,
             }
-            # La géométrie n'est pas retransmise 33 fois par seconde.
-            # Répétition périodique pour les clients qui se reconnectent.
+
+
             if self.__numero_image <= 12 or self.__numero_image % 40 == 0:
                 etat["plan_osm_zip"] = self.__plan_zip
             return etat
@@ -141,7 +137,7 @@ class SessionClientAvecOSM(serveur_original.SessionClient):
                 raise ValueError("Un carrefour ne peut pas être choisi sans carte")
             self._SessionClient__serveur.changer_carte_osm(carte, centre)
         except Exception as erreur:
-            # Le client existant affiche déjà les erreurs dans le panneau.
+
             reponse = encoder({
                 "type": "reponse_urgence",
                 "ok": False,
@@ -155,7 +151,7 @@ class ServeurAvecOSM(serveur_original.ServeurReseau):
     """Réutilise intégralement les sockets et les threads existants."""
 
     def __init__(self):
-        # La méthode privée d'acceptation de l'ancien serveur utilise ce nom.
+
         serveur_original.SessionClient = SessionClientAvecOSM
         super().__init__()
 
@@ -164,9 +160,7 @@ class ServeurAvecOSM(serveur_original.ServeurReseau):
         with self._ServeurReseau__verrou_simulation:
             simulation = self._ServeurReseau__simulation
             if simulation is not None and not isinstance(simulation, SimulationAvecOSM):
-                self._ServeurReseau__simulation = SimulationAvecOSM(
-                    simulation, largeur, hauteur
-                )
+                self._ServeurReseau__simulation = SimulationAvecOSM(simulation, largeur, hauteur)
 
     def changer_carte_osm(self, carte, carrefour):
         simulation = self.simulation()

@@ -1,4 +1,8 @@
-"""Dessin des routes, feux et voitures du nouveau moteur multicarrefours."""
+# ---------------------------------------------------------------------------
+# SAÉ 3.02 | src/gui/vue_reseau_osm.py
+# Dessin des routes, des feux et des véhicules du mode OSM.
+# Le moteur de circulation reste côté serveur.
+# ---------------------------------------------------------------------------
 import math
 from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QColor, QFont, QPen
@@ -12,13 +16,13 @@ COULEURS = {
 }
 
 
+# Partie principale : affichage
 def dessiner_reseau_osm(painter, simulation, clignotant_tick):
     dessin = simulation.get_dessin()
     painter.setRenderHint(painter.RenderHint.Antialiasing)
     painter.fillRect(painter.viewport(), QColor('#286b30'))
     painter.save()
-    painter.setClipRect(0, 100, int(dessin['limite_droite']),
-                        max(1, painter.viewport().height() - 105))
+    painter.setClipRect(0, 100, int(dessin['limite_droite']), max(1, painter.viewport().height() - 105))
 
     routes = QPen(QColor('#7b7b7b'), 32)
     routes.setCapStyle(Qt.PenCapStyle.RoundCap)
@@ -27,12 +31,12 @@ def dessiner_reseau_osm(painter, simulation, clignotant_tick):
     for a, b in dessin['segments']:
         painter.drawLine(QPointF(*a), QPointF(*b))
 
-    # Petites lignes centrales purement décoratives.
+
     painter.setPen(QPen(QColor('#bfc3c3'), 1, Qt.PenStyle.DashLine))
     for a, b in dessin['segments']:
         painter.drawLine(QPointF(*a), QPointF(*b))
 
-    # Aucun point de debug pour les intersections : afficher les vrais feux seulement.
+
     couleurs_feux = {'vert':'#44ec56', 'orange':'#fec442', 'rouge':'#fa4444'}
     for noeud, precedent, (x,y) in dessin['feux']:
         etat = simulation.get_etat_feu(noeud, precedent)
@@ -46,7 +50,7 @@ def dessiner_reseau_osm(painter, simulation, clignotant_tick):
         painter.translate(x, y)
         painter.rotate(math.degrees(angle))
         char = agent.get_service() == 'char'
-        # Dimensions plus petites uniquement dans le mode OSM.
+
         longueur, largeur = (32, 17) if char else (19, 10)
         nom_couleur = {
             'ambulance': 'white', 'pompier': 'red',
@@ -70,8 +74,7 @@ def dessiner_reseau_osm(painter, simulation, clignotant_tick):
     painter.restore()
     painter.setPen(QPen(QColor('white')))
     painter.setFont(QFont('Arial', 11))
-    painter.drawText(16, 135,
-                     f'Mode multicarrefours : {len(simulation.get_vehicules())} véhicules')
+    painter.drawText(16, 135, f'Mode multicarrefours : {len(simulation.get_vehicules())} véhicules')
     painter.setFont(QFont('Arial', 9))
     painter.drawText(16, painter.viewport().height() - 16,
                      'Données © contributeurs OpenStreetMap — phases de feux simulées')

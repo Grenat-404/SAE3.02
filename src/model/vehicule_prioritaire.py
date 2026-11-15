@@ -1,3 +1,8 @@
+# ---------------------------------------------------------------------------
+# SAÉ 3.02 | src/model/vehicule_prioritaire.py
+# Véhicules d'urgence héritant des véhicules classiques.
+# Définit service, couleur, priorité et dimensions du char.
+# ---------------------------------------------------------------------------
 from src.model.vehicule import Vehicule
 
 

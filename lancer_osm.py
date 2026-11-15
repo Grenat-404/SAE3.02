@@ -1,14 +1,13 @@
-"""Lancement de la simulation avec sélection OSM et deux machines.
-
-Usage :
-    python lancer_osm.py --role serveur
-    python lancer_osm.py --role client
-L'ancien lancer.py reste inchangé.
-"""
+# ---------------------------------------------------------------------------
+# SAÉ 3.02 | lancer_osm.py
+# Point d'entrée unique pour lancer la VM serveur ou la VM client.
+# Conserve la découverte du serveur et le choix entre carrefour classique et OSM.
+# ---------------------------------------------------------------------------
 import argparse
 import sys
 
 
+# Partie principale : démarrage des deux rôles
 def main():
     analyseur = argparse.ArgumentParser(description="SAE3.02 - Client/serveur avec OSM")
     analyseur.add_argument("--role", required=True, choices=("serveur", "client"))

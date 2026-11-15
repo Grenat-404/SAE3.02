@@ -1,8 +1,8 @@
-"""Affichage OSM au-dessus de l'interface client existante.
-
-Pas de moteur de circulation sur le client : les agents et les feux sont
-toujours calculés par la VM serveur.
-"""
+# ---------------------------------------------------------------------------
+# SAÉ 3.02 | src/osm/integration_client.py
+# Adaptateur qui affiche les états OSM reçus par TCP.
+# Conserve la fenêtre d'urgence et le carrefour prédéfini.
+# ---------------------------------------------------------------------------
 import base64
 import json
 import socket
@@ -25,8 +25,7 @@ class VehiculeDistantOSM:
         self.__donnees = donnees
 
     def position(self):
-        return (self.__donnees["x"], self.__donnees["y"],
-                self.__donnees["angle"])
+        return (self.__donnees["x"], self.__donnees["y"], self.__donnees["angle"])
 
     def get_service(self):
         return self.__donnees["service"]
@@ -52,8 +51,8 @@ class SimulationDistanteAvecOSM(SimulationDistante):
         reseau = self._SimulationDistante__reseau
         reseau._ClientReseau__actif.clear()
         reseau._ClientReseau__connecte.clear()
-        # Conserver une référence locale : le thread peut mettre __socket à
-        # None pendant la fermeture. Les fichiers réseau originaux restent intacts.
+
+
         connexion = reseau._ClientReseau__socket
         if connexion is not None:
             try:
@@ -93,18 +92,14 @@ class SimulationDistanteAvecOSM(SimulationDistante):
 
     def get_vehicules(self):
         if self.get_mode() == "osm":
-            return [
-                VehiculeDistantOSM(d)
-                for d in self._SimulationDistante__etat_affiche.get("agents_osm", [])
-            ]
+            return [ VehiculeDistantOSM(d) for d in self._SimulationDistante__etat_affiche.get("agents_osm", []) ]
         return super().get_vehicules()
 
     def get_etat_feu(self, noeud, precedent):
         cle = str(noeud) + "|" + str(precedent)
-        return self._SimulationDistante__etat_affiche.get(
-            "feux_osm", {}
-        ).get(cle, "rouge")
+        return self._SimulationDistante__etat_affiche.get("feux_osm", {}).get(cle, "rouge")
 
+    # Partie principale : traitement principal
     def choisir_carte(self, carrefour):
         reseau = self._SimulationDistante__reseau
         if not reseau.connecte():
@@ -118,7 +113,7 @@ class SimulationDistanteAvecOSM(SimulationDistante):
                 "carte": Path(carrefour["chemin"]).name,
                 "carrefour": str(carrefour["id"]),
             }
-        # Réutilise la file d'envoi TCP du client original.
+
         reseau._ClientReseau__a_envoyer.put(message)
 
 
@@ -141,10 +136,8 @@ class InterfaceAvecOSM(Interface):
         """Dessine les gyrophares du carrefour prédéfini, sans modifier l'interface originale."""
         super()._Interface__dessiner_vehicule(painter, vehicule)
 
-        # Les véhicules classiques et le char ne reçoivent pas de gyrophare.
-        service = vehicule.get_type_service() if hasattr(
-            vehicule, "get_type_service"
-        ) else None
+
+        service = vehicule.get_type_service() if hasattr(vehicule, "get_type_service") else None
         if service not in ("ambulance", "pompier", "police"):
             return
 
@@ -155,8 +148,7 @@ class InterfaceAvecOSM(Interface):
         taille = 5
         espace = 2
 
-        # Les carrés sont sur le toit, au centre et perpendiculaires
-        # au sens de circulation (comme sur les véhicules OSM).
+
         if vehicule.get_direction() in ("droite", "gauche"):
             x_bleu = x + (largeur - taille) // 2
             y_bleu = y + (hauteur - 2 * taille - espace) // 2
@@ -172,6 +164,7 @@ class InterfaceAvecOSM(Interface):
         painter.setBrush(QColor("#ed3333"))
         painter.drawRect(x_rouge, y_rouge, taille, taille)
 
+    # Partie principale : traitement principal
     def paintEvent(self, event):
         if self.simulation.get_mode() != "osm":
             return super().paintEvent(event)

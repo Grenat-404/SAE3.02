@@ -1,6 +1,9 @@
-"""Tests de non-régression : véhicules prioritaires et clignotants.
-Exécution : python -m unittest discover -s tests
-"""
+# ---------------------------------------------------------------------------
+# SAÉ 3.02 | tests/test_integration_urgences.py
+# Tests de comportement des urgences dans la simulation prédéfinie.
+# Exécuter avec unittest depuis la racine du dépôt.
+# ---------------------------------------------------------------------------
+
 import unittest
 
 from src.model.vehicule import Vehicule
@@ -21,8 +24,7 @@ class IntegrationUrgencesTest(unittest.TestCase):
         self.assertEqual(vehicule.get_y(), 20)
 
     def test_char_assaut(self):
-        char = VehiculePrioritaire(10, 20, 4, "droite", "haut",
-                                  "char", 4, "Intervention", 1)
+        char = VehiculePrioritaire(10, 20, 4, "droite", "haut", "char", 4, "Intervention", 1)
         self.assertEqual(char.get_couleur(), "darkGreen")
         self.assertEqual(char.get_dimensions(), (50, 32))
         self.assertEqual(char.get_direction_initiale(), "droite")
@@ -37,8 +39,7 @@ class IntegrationUrgencesTest(unittest.TestCase):
         simulation.creer_urgence("Secours", 2, [
             {"service": "ambulance", "direction": "bas", "destination": None},
         ])
-        prioritaires = [v for v in simulation.get_vehicules()
-                        if isinstance(v, VehiculePrioritaire)]
+        prioritaires = [v for v in simulation.get_vehicules() if isinstance(v, VehiculePrioritaire)]
         self.assertEqual(len(prioritaires), 3)
 
         intersection = simulation.get_intersections()

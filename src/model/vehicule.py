@@ -1,3 +1,8 @@
+# ---------------------------------------------------------------------------
+# SAÉ 3.02 | src/model/vehicule.py
+# Modèle des véhicules du carrefour prédéfini.
+# Gère mouvement, clignotants, parking et écartement latéral.
+# ---------------------------------------------------------------------------
 import random
 
 class Vehicule:
@@ -9,7 +14,7 @@ class Vehicule:
         self.__couleur = random.choice(["green", "yellow", "cyan", "magenta", "darkCyan", "darkMagenta", "darkYellow"])
         self.__destination = destination
         self.__ticks_bloque = 0
-        self.__etat = "route"  # "route", "entrant", "gare", "sortant"
+        self.__etat = "route"
         self.__trajet = []
         self.__place = None
         self.__timer = 0
@@ -17,14 +22,14 @@ class Vehicule:
         self.__clignotant = None
         self.__temps_clignotant = 0
 
-        # Gestion de l'écartement pour les urgences
+
         self.__ecartement_urgence = False
         self.__decalage_lateral = 0
 
         self.__decalage_max = 28
         self.__vitesse_decalage = 2
 
-        # Position normale sur la voie
+
         if direction in ("droite", "gauche"):
             self.__position_laterale_reference = y
         else:
@@ -61,11 +66,11 @@ class Vehicule:
 
     def get_dimensions(self):
         if self.__direction == "droite" or self.__direction == "gauche":
-            return 30, 20 # (Largeur, Hauteur)
+            return 30, 20
         elif self.__direction == "bas" or self.__direction == "haut":
-            return 20, 30 # (Largeur, Hauteur)
+            return 20, 30
         else:
-            return 30, 20 # Valeurs par défaut
+            return 30, 20
 
     def get_largeur(self):
         l, h = self.get_dimensions()
@@ -129,6 +134,7 @@ class Vehicule:
     def est_ecarte_urgence(self):
         return self.__ecartement_urgence or self.__decalage_lateral != 0
 
+    # Partie principale : traitement principal
     def mettre_a_jour_ecartement(self):
         ancien = self.__decalage_lateral
         if self.__ecartement_urgence:

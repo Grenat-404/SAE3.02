@@ -1,7 +1,9 @@
-"""Régressions de la file de secours et du retour sur la voie.
+# ---------------------------------------------------------------------------
+# SAÉ 3.02 | tests/test_secours_ecartement.py
+# Tests du dégagement du carrefour prédéfini en cas d'urgence.
+# Conserve les garanties de la simulation classique.
+# ---------------------------------------------------------------------------
 
-À lancer à la racine : python -m unittest discover -s tests -v
-"""
 import unittest
 from unittest.mock import patch
 
@@ -28,8 +30,7 @@ class TestSecoursEtEcartement(unittest.TestCase):
                 with patch("src.simulation.simulation.random.randint", return_value=2):
                     for _ in range(2):
                         simulation.avancer()
-                secours = [v for v in simulation.get_vehicules()
-                          if isinstance(v, VehiculePrioritaire)]
+                secours = [v for v in simulation.get_vehicules() if isinstance(v, VehiculePrioritaire)]
                 self.assertEqual(len(secours), 3)
                 positions = [(v.get_x(), v.get_y()) for v in secours]
                 self.assertEqual(len(set(positions)), 3)
@@ -45,8 +46,7 @@ class TestSecoursEtEcartement(unittest.TestCase):
         with patch("src.simulation.simulation.random.randint", return_value=2):
             for _ in range(55):
                 simulation.avancer()
-        secours = [v for v in simulation.get_vehicules()
-                  if isinstance(v, VehiculePrioritaire)]
+        secours = [v for v in simulation.get_vehicules() if isinstance(v, VehiculePrioritaire)]
         self.assertEqual(len(secours), 3)
         self.assertTrue(all(v.get_x() >= 0 for v in secours))
 
@@ -55,14 +55,12 @@ class TestSecoursEtEcartement(unittest.TestCase):
         simulation.get_vehicules().clear()
         simulation.creer_urgence("Urgence A", 3, [configuration("droite")])
         simulation.creer_urgence("Urgence B", 5, [configuration("droite")])
-        secours = [v for v in simulation.get_vehicules()
-                  if isinstance(v, VehiculePrioritaire)]
+        secours = [v for v in simulation.get_vehicules() if isinstance(v, VehiculePrioritaire)]
         self.assertEqual(len(secours), 2)
         self.assertGreaterEqual(abs(secours[0].get_x() - secours[1].get_x()), 65)
         with patch("src.simulation.simulation.random.randint", return_value=2):
             simulation.avancer()
-        self.assertEqual(len([v for v in simulation.get_vehicules()
-                              if isinstance(v, VehiculePrioritaire)]), 2)
+        self.assertEqual(len([v for v in simulation.get_vehicules() if isinstance(v, VehiculePrioritaire)]), 2)
 
     def test_retour_sans_avancer_ni_chevaucher(self):
         simulation = Simulation(1600, 900)
@@ -79,9 +77,9 @@ class TestSecoursEtEcartement(unittest.TestCase):
         with patch("src.simulation.simulation.random.randint", return_value=2):
             for _ in range(14):
                 simulation.avancer()
-                # Le véhicule décalé doit rester arrêté jusqu'au retour complet.
+
                 self.assertEqual(devant.get_x(), 300)
-                # Un véhicule suiveur ne doit jamais prendre son emplacement.
+
                 self.assertGreaterEqual(devant.get_x() - derriere.get_x(), 40)
         self.assertEqual(devant.get_y(), 500)
 

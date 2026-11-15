@@ -1,4 +1,9 @@
-"""Tests des sockets avec simulation factice; n'exigent pas PyQt6."""
+# ---------------------------------------------------------------------------
+# SAÉ 3.02 | tests/test_reseau_2vm.py
+# Tests du protocole client/serveur et du transport TCP/UDP.
+# Vérifie les messages et la communication sur deux machines.
+# ---------------------------------------------------------------------------
+
 import socket
 import threading
 import time
@@ -22,8 +27,7 @@ class SimulationFictive:
         self.ticks += 1
 
     def exporter_etat_reseau(self):
-        return {"type": "etat", "ticks": self.ticks,
-                "vehicules": [], "routes": [], "feux": []}
+        return {"type": "etat", "ticks": self.ticks, "vehicules": [], "routes": [], "feux": []}
 
     def creer_urgence(self, type_urgence, niveau_priorite, vehicules):
         self.numero += 1
@@ -67,8 +71,7 @@ class TestReseau(unittest.TestCase):
         fil = threading.Thread(target=serveur.tourner, daemon=True)
         fil.start()
         etats, reponses = [], []
-        client = ClientReseau(1200, 800, etats.append, reponses.append,
-                              port_tcp=tcp, port_udp=udp)
+        client = ClientReseau(1200, 800, etats.append, reponses.append, port_tcp=tcp, port_udp=udp)
         client.start()
         try:
             fin = time.monotonic() + 6

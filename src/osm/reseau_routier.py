@@ -1,6 +1,8 @@
-"""Graphe routier OSM local et calcul de chemin (Dijkstra).
-Uniquement la bibliothèque standard de Python. Aucune requête Internet.
-"""
+# ---------------------------------------------------------------------------
+# SAÉ 3.02 | src/osm/reseau_routier.py
+# Lecture hors-ligne du graphe routier OpenStreetMap.
+# Gère les sens uniques, sélection des carrefours et recherche Dijkstra.
+# ---------------------------------------------------------------------------
 import heapq
 import math
 import random
@@ -18,14 +20,15 @@ TERRE = 6371000
 
 class ReseauRoutier:
     def __init__(self, fichier):
-        self.__noeuds = {}          # identifiant -> (latitude, longitude)
-        self.__graphe = defaultdict(list)  # depart -> [(arrivee, metres)]
-        self.__segments = []        # tronçons physiques, pour le dessin
-        self.__voisins = defaultdict(set)  # voisins dans les deux sens
+        self.__noeuds = {}
+        self.__graphe = defaultdict(list)
+        self.__segments = []
+        self.__voisins = defaultdict(set)
         self.__feux_osm = set()
         self.__rues = defaultdict(set)
         self.__lire(fichier)
 
+    # Partie principale : traitement principal
     def __lire(self, fichier):
         racine = ET.parse(fichier).getroot()
         if racine.tag != 'osm':
@@ -33,9 +36,7 @@ class ReseauRoutier:
 
         for element in racine.findall('node'):
             identifiant = element.get('id')
-            self.__noeuds[identifiant] = (
-                float(element.get('lat')), float(element.get('lon'))
-            )
+            self.__noeuds[identifiant] = (float(element.get('lat')), float(element.get('lon')))
             tags = {t.get('k'): t.get('v') for t in element.findall('tag')}
             if tags.get('highway') == 'traffic_signals':
                 self.__feux_osm.add(identifiant)
@@ -96,7 +97,7 @@ class ReseauRoutier:
         Le réseau de circulation garde tous ses noeuds et ses carrefours.
         Seule la liste des choix est simplifiée.
         """
-        distance_minimale = 75  # mètres entre deux centres proposés
+        distance_minimale = 75
         candidats = []
         for identifiant in self.get_intersections():
             noms = sorted(self.__rues[identifiant])
@@ -110,17 +111,13 @@ class ReseauRoutier:
                 'feu': self.a_feu_osm(identifiant),
             })
 
-        # Choisir de préférence le vrai croisement de rues, plutôt qu'un
-        # noeud légèrement décalé sur une branche du même carrefour.
-        candidats.sort(key=lambda c: (
-            -c['nb_rues'], -int(c['feu']), -c['nb_branches'], c['nom'], c['id']
-        ))
+
+        candidats.sort(key=lambda c: (-c['nb_rues'], -int(c['feu']), -c['nb_branches'], c['nom'], c['id']))
 
         retenus = []
         for candidat in candidats:
-            if all(self.distance_metres(candidat['id'], autre['id'])
-                   >= distance_minimale for autre in retenus):
-                # Les champs supplémentaires servent seulement au classement.
+            if all(self.distance_metres(candidat['id'], autre['id']) >= distance_minimale for autre in retenus):
+
                 retenus.append({
                     'id': candidat['id'], 'nom': candidat['nom'],
                     'latitude': candidat['latitude'],
@@ -142,7 +139,7 @@ class ReseauRoutier:
     def projeter(self, origine, largeur, hauteur):
         """Coordonnées en pixels des nœuds autour du centre choisi."""
         lat0, lon0 = self.__noeuds[origine]
-        # Vue d'environ 700 mètres, adaptée à une carte de 1-2 km.
+
         largeur_utile = max(350, largeur - 280)
         hauteur_utile = max(300, hauteur - 140)
         echelle = min(largeur_utile / 700, hauteur_utile / 700, 2.5)
@@ -154,6 +151,7 @@ class ReseauRoutier:
             positions[identifiant] = (cx + x * echelle, cy - y * echelle)
         return positions, largeur_utile + 25
 
+    # Partie principale : calcul des itinéraires
     def dijkstra(self, depart, arrivee, hasard=None):
         """Plus court chemin ; un léger hasard crée plusieurs itinéraires.
 
@@ -173,7 +171,7 @@ class ReseauRoutier:
                     chemin.append(parents[chemin[-1]])
                 return list(reversed(chemin))
             for suivant, distance in self.__graphe[noeud]:
-                # Même perturbation pour une paire d'arêtes durant cet appel.
+
                 facteur = hasard.get((noeud, suivant), 1.0) if hasard else 1.0
                 nouveau = cout + distance * facteur
                 if nouveau < couts.get(suivant, float('inf')):
@@ -186,7 +184,7 @@ class ReseauRoutier:
         """Trajet passant éventuellement par un nœud intermédiaire."""
         noeuds = list(self.__graphe)
         facteurs = {}
-        # Graine aléatoire, mais pondérations cohérentes pendant une recherche.
+
         for noeud in noeuds:
             for suivant, _ in self.__graphe[noeud]:
                 facteurs[(noeud, suivant)] = generateur.uniform(0.8, 1.3)
@@ -202,13 +200,11 @@ class ReseauRoutier:
             if not a or not b:
                 continue
             chemin = a + b[1:]
-            # Pas de demi-tour ni de boucles sur la route obtenue.
+
             if len(set(chemin)) != len(chemin):
                 continue
-            longueur = sum(self.distance_metres(x, y)
-                           for x, y in zip(chemin, chemin[1:]))
-            direct_m = sum(self.distance_metres(x, y)
-                           for x, y in zip(direct, direct[1:]))
+            longueur = sum(self.distance_metres(x, y) for x, y in zip(chemin, chemin[1:]))
+            direct_m = sum(self.distance_metres(x, y) for x, y in zip(direct, direct[1:]))
             if longueur < direct_m * 1.7:
                 return chemin
         return direct

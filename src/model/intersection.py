@@ -1,3 +1,8 @@
+# ---------------------------------------------------------------------------
+# SAÉ 3.02 | src/model/intersection.py
+# Modèle géométrique du carrefour prédéfini.
+# Décrit la zone de croisement utilisée par la simulation.
+# ---------------------------------------------------------------------------
 class Intersection:
     def __init__(self, x, y, largeur, hauteur):
         self.__x = x

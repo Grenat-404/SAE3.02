@@ -1,3 +1,8 @@
+# ---------------------------------------------------------------------------
+# SAÉ 3.02 | src/model/place.py
+# Définition d'une place de stationnement.
+# Objet utilisé par le parking du mode prédéfini.
+# ---------------------------------------------------------------------------
 class Place:
     def __init__(self, x, y, largeur, hauteur):
         self.__x = x

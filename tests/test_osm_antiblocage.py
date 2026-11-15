@@ -1,4 +1,9 @@
-"""Tests anti-interblocage du moteur OSM (sans PyQt)."""
+# ---------------------------------------------------------------------------
+# SAÉ 3.02 | tests/test_osm_antiblocage.py
+# Tests des trajets et de l'anti-blocage du moteur OSM.
+# Contrôle des densités, réservations et itinéraires fixes des urgences.
+# ---------------------------------------------------------------------------
+
 import unittest
 from pathlib import Path
 
@@ -15,8 +20,8 @@ class SimulationAntibouchonTests(unittest.TestCase):
         return SimulationReseauOSM(str(fichier), centre, 1440, 900, graine=8)
 
     def test_itineraires_urgence_fixes_trafic_aleatoire(self):
-        # Même carte et carrefour : le parcours des urgences ne dépend
-        # ni de la graine aléatoire ni des voitures ordinaires apparues.
+
+
         premier = self.simulation()
         second = self.simulation()
         configurations = [
@@ -31,7 +36,7 @@ class SimulationAntibouchonTests(unittest.TestCase):
             )
             if not trajet:
                 continue
-            # Perturber l'état de la circulation entre deux appels.
+
             for _ in range(5):
                 premier.avancer()
             suivant = premier._SimulationReseauOSM__choisir_itineraire(
@@ -56,8 +61,7 @@ class SimulationAntibouchonTests(unittest.TestCase):
             )
             if trajet:
                 configuration = [
-                    {"direction": direction, "destination": None,
-                     "service": "ambulance"}
+                    {"direction": direction, "destination": None, "service": "ambulance"}
                     for _ in range(2)
                 ]
                 sim.creer_urgence("Accident", 3, configuration)
@@ -69,10 +73,7 @@ class SimulationAntibouchonTests(unittest.TestCase):
 
     def test_trafic_ordinaire_garde_du_hasard(self):
         sim = self.simulation()
-        a = [
-            tuple(sim._SimulationReseauOSM__choisir_itineraire() or [])
-            for _ in range(12)
-        ]
+        a = [ tuple(sim._SimulationReseauOSM__choisir_itineraire() or []) for _ in range(12) ]
         routes = {chemin for chemin in a if chemin}
         self.assertGreater(len(routes), 1)
 
@@ -84,19 +85,14 @@ class SimulationAntibouchonTests(unittest.TestCase):
 
     def test_repartition_par_zones(self):
         sim = self.simulation()
-        # Une zone vide doit être choisie beaucoup plus souvent qu'une
-        # zone contenant déjà de nombreux véhicules.
+
+
         groupes = {0: ["nord"], 4: ["centre"], 8: ["sud"]}
         occupation = [20, 0, 0, 0, 3, 0, 0, 0, 0]
-        tirages = [
-            sim._SimulationReseauOSM__choisir_noeud_reparti(
-                groupes, occupation
-            )
-            for _ in range(400)
-        ]
+        tirages = [ sim._SimulationReseauOSM__choisir_noeud_reparti(groupes, occupation) for _ in range(400) ]
         self.assertGreater(tirages.count("sud"), tirages.count("nord") * 4)
 
-        # La lecture spatiale doit bien différencier le haut et le bas.
+
         self.assertNotEqual(
             sim._SimulationReseauOSM__zone_ecran(200, 160),
             sim._SimulationReseauOSM__zone_ecran(200, 820)
@@ -109,9 +105,9 @@ class SimulationAntibouchonTests(unittest.TestCase):
         arriere.set_avancement(100)
         avant.set_avancement(125)
         sim._SimulationReseauOSM__agents = [arriere, avant]
-        # À 22,5 pixels de centre-à-centre, l'arrière attend.
+
         self.assertFalse(sim._SimulationReseauOSM__route_libre(arriere, 102.5))
-        # À 37,5 pixels, l'arrière doit pouvoir avancer.
+
         avant.set_avancement(140)
         self.assertTrue(sim._SimulationReseauOSM__route_libre(arriere, 102.5))
 
@@ -121,7 +117,7 @@ class SimulationAntibouchonTests(unittest.TestCase):
         sim._SimulationReseauOSM__agents = [voiture]
         sim._SimulationReseauOSM__immobilisation = {voiture: 629}
         sim._SimulationReseauOSM__tick = 629
-        # Bloquer cette voiture pour reproduire un interblocage durable.
+
         sim._SimulationReseauOSM__route_libre = lambda v, cible: False
         sim._SimulationReseauOSM__controle_intersections = lambda v, cible: (cible, None)
         sim._SimulationReseauOSM__apparition = lambda: None

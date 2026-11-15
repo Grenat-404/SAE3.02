@@ -1,3 +1,8 @@
+# ---------------------------------------------------------------------------
+# SAÉ 3.02 | src/model/parking.py
+# Gestion des places et des manœuvres du parking prédéfini.
+# État et déplacements utilisés uniquement dans le mode classique.
+# ---------------------------------------------------------------------------
 import random
 from src.model.route import Route
 from src.model.place import Place
@@ -29,7 +34,7 @@ class Parking:
         self.__sortie = (x_sortie + largeur_voie // 2, y_bas)
         self.__ligne_arret_sortie = (x_sortie, x_sortie + largeur_voie, y_bas + trottoir - 3)
 
-        # Allée à double sens : vers l'est au sud, vers l'ouest au nord (conduite à droite)
+
         allee = hauteur - 2 * place_h
         y_milieu = y + hauteur / 2
         self.__y_est = y_milieu + allee / 4
@@ -79,11 +84,7 @@ class Parking:
     def get_trajet_entree(self, place):
         cx = place.get_x() + place.get_largeur() / 2
         cy = place.get_y() + place.get_hauteur() / 2
-        return [
-            (self.__entree[0], self.__y_est),
-            (cx, self.__y_est),
-            (cx, cy)
-        ]
+        return [ (self.__entree[0], self.__y_est), (cx, self.__y_est), (cx, cy) ]
 
     def get_trajet_sortie(self, place, y_route):
         cx = place.get_x() + place.get_largeur() / 2

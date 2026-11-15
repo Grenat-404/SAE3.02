@@ -1,3 +1,8 @@
+# ---------------------------------------------------------------------------
+# SAÉ 3.02 | src/model/route.py
+# Représentation géométrique d'une route du carrefour classique.
+# Fournit position et dimensions aux autres modules.
+# ---------------------------------------------------------------------------
 class Route:
     def __init__(self, x, y, largeur, hauteur):
         self.__x = x

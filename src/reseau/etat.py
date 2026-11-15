@@ -1,3 +1,8 @@
+# ---------------------------------------------------------------------------
+# SAÉ 3.02 | src/reseau/etat.py
+# Conversion des objets du carrefour prédéfini en messages JSON.
+# Transmission des véhicules, feux, piétons et parking au client.
+# ---------------------------------------------------------------------------
 from src.model.vehicule_prioritaire import VehiculePrioritaire
 
 
@@ -10,6 +15,7 @@ def rectangle(objet):
     }
 
 
+# Partie principale : export JSON
 def construire_etat(simulation):
     parking = simulation.get_parking()
     intersection = simulation.get_intersections()

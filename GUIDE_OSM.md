@@ -1,74 +1,56 @@
-# SAÉ3.02 — OSM + client/serveur sans modification des fichiers d'origine
+# Guide du mode OSM — SAÉ 3.02
 
-Cette branche part de `affichage-client-serveur` et ajoute les modules OSM
-de la branche `osm` et des adaptateurs.
+## Fonctionnement
 
-**Les fichiers préexistants de `affichage-client-serveur` sont conservés
-à l'identique.** Le lancement original `lancer.py` n'est pas modifié.
-
-## Installation
-
-Sur les deux VM Debian, avec Python 3 et les fichiers du dépôt :
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-Démarrer le serveur (sans interface graphique) sur la VM serveur :
+**Un seul lanceur :** `lancer_osm.py`. Son argument `--role` choisit la
+VM serveur ou la VM client ; le choix de la simulation est ensuite réalisé
+depuis l'interface. Il n'est pas nécessaire de lancer une seconde application
+pour le carrefour prédéfini.
 
 ```bash
 python3 lancer_osm.py --role serveur
-```
-
-Puis sur la VM client :
-
-```bash
 python3 lancer_osm.py --role client
 ```
 
-La découverte automatique UDP/TCP est la même que dans `lancer.py`.
+Le **serveur** calcule l'ensemble des mouvements et transmet par TCP les
+positions, les feux et les informations utiles au dessin. La recherche
+automatique d'adresse utilise UDP ; les ports sont définis dans
+`src/reseau/protocole.py` (TCP 5050 et UDP 5051).
 
-## Mode d'emploi
+## Cartes et carrefours
 
-Sur le client, le sélecteur en haut à gauche propose les fichiers
-`data/maps/*.osm` et la liste des carrefours détectés. Cliquer sur
-**Charger** pour basculer. **Carrefour prédéfini** remet l'ancien moteur.
+Le sélecteur du client lit les fichiers `data/maps/*.osm` et regroupe les
+centres de carrefours proches. Les mêmes fichiers doivent être présents
+sur le serveur, même si seul celui-ci exécute la circulation.
 
-Les cartes doivent se trouver dans `data/maps/` sur **les deux VM** et
-porter le même nom. Le serveur valide le nom du fichier demandé ; il n'ouvre
-jamais de chemin transmis directement par le client.
+Le moteur OSM utilise un graphe de routes routières hors-ligne : Dijkstra,
+prise en compte des sens uniques, feux issus des données OSM et véhicules
+aléatoires répartis selon l'occupation visible.
 
-Le mode OSM utilise le moteur multicarrefours de la branche `osm`
-(Dijkstra, sens uniques, feux, véhicules prioritaires). Le panneau
-d'urgence original envoie toujours ses demandes au serveur. Les piétons et
-le parking demeurent dans le mode carrefour prédéfini ; ils ne sont pas
-implantés dans le moteur OSM.
+**Carrefour prédéfini** conserve les fonctionnalités d'origine, notamment
+parking, passages piétons et véhicules d'urgence.
 
-Le serveur envoie aux clients les positions et états à chaque tick, et
-renvoie périodiquement le plan routier compressé. Le moteur OSM ne tourne
-pas sur la VM client.
+## Gestion des urgences OSM
 
-## Continuer à utiliser la version inchangée
+Le panneau permet de choisir les véhicules, leur provenance et leur direction.
+Pour une même carte, un même carrefour et des directions identiques,
+les urgences conservent **un itinéraire fixe**. Le trafic normal continue à
+choisir des itinéraires aléatoires. Les voitures ordinaires essaient de se
+décaler ou de trouver un détour ; le rabattement dépend de l'espace disponible.
+
+## Tests
 
 ```bash
-python3 lancer.py --role serveur
-python3 lancer.py --role client
+python3 -m compileall -q lancer_osm.py src tests
+python3 -m unittest discover -s tests -p "test_*.py"
 ```
 
-## Vérifications conseillées
+Tester aussi manuellement le chargement de Colmar, les cartes de démonstration,
+l'envoi de plusieurs urgences et la fermeture du client.
 
-1. Lancer le serveur et le client et vérifier le carrefour d'origine.
-2. Charger `demo_grille_multicarrefours.osm` sur le client.
-3. Vérifier les routes, les mouvements et les feux sur plusieurs intersections.
-4. Envoyer une ambulance depuis le panneau d'urgence.
-5. Tester la réinitialisation et le retour au carrefour prédéfini.
-6. Tester deux VM sur le même réseau local (UDP 5051 / TCP 5050 ouverts).
+## Historique du nettoyage
 
-En cas d'échec de chargement côté serveur, le panneau d'urgence affiche
-un message d'erreur et l'ancien moteur reste actif.
-
-**Important :** ce module est une intégration additionnelle ; la fluidité
-sur les extraits OSM très denses et le fonctionnement des tests restent à
-valider sur les VM réelles.
+L'ancien lanceur sans OSM, le point d'entrée `main.py` et les modules d'un
+prototype de rendu OSM non utilisé ont été retirés pour éviter les doublons.
+Une sauvegarde du dépôt avant nettoyage est disponible sur la branche
+`sauvegarde-avant-nettoyage-2026-11-15`.
