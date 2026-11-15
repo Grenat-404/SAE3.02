@@ -20,6 +20,7 @@ COULEURS = {
 
 # Partie principale : affichage
 def dessiner_reseau_osm(painter: QPainter, simulation: SimulationDistanteAvecOSM, clignotant_tick: int) -> None:
+    """Affiche le traitement « dessiner reseau osm »."""
     dessin = simulation.get_dessin()
     painter.setRenderHint(painter.RenderHint.Antialiasing)
     painter.fillRect(painter.viewport(), QColor('#286b30'))
