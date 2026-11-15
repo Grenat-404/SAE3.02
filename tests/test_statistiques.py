@@ -8,7 +8,9 @@ from src.statistiques import BaseStatistiques
 
 
 class TestBaseStatistiques(unittest.TestCase):
+    """Représente TestBaseStatistiques dans l'application."""
     def test_simulations_statistiques_et_urgences(self):
+        """Exécute le traitement « test simulations statistiques et urgences »."""
         with tempfile.TemporaryDirectory() as dossier:
             chemin = Path(dossier) / "statistiques.db"
             base = BaseStatistiques(chemin)
@@ -41,6 +43,7 @@ class TestBaseStatistiques(unittest.TestCase):
                     (premiere,)).fetchone()[0], 3)
 
     def test_cles_etrangeres(self):
+        """Exécute le traitement « test cles etrangeres »."""
         with tempfile.TemporaryDirectory() as dossier:
             base = BaseStatistiques(Path(dossier) / "test.db")
             with self.assertRaises(sqlite3.IntegrityError):
