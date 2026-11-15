@@ -11,14 +11,27 @@ if TYPE_CHECKING:
     from src.simulation.simulation import Simulation
 
 class ObjetRectangulaire(Protocol):
-    """Représente ObjetRectangulaire dans l'application."""
-    def get_x(self) -> float: ...
-    def get_y(self) -> float: ...
-    def get_largeur(self) -> int: ...
-    def get_hauteur(self) -> int: ...
+    """Décrit les dimensions minimales d'un objet exportable vers le client."""
+
+    def get_x(self) -> float:
+        """Retourne la coordonnée horizontale de l'objet."""
+        ...
+
+    def get_y(self) -> float:
+        """Retourne la coordonnée verticale de l'objet."""
+        ...
+
+    def get_largeur(self) -> int:
+        """Retourne la largeur de l'objet."""
+        ...
+
+    def get_hauteur(self) -> int:
+        """Retourne la hauteur de l'objet."""
+        ...
+
 
 def rectangle(objet: ObjetRectangulaire) -> dict[str, float]:
-        """Récupère le traitement « get x »."""
+    """Convertit la position et les dimensions d'un objet en dictionnaire."""
     return {
         "x": objet.get_x(),
         "y": objet.get_y(),
