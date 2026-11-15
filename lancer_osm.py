@@ -6,7 +6,6 @@
 import argparse
 import sys
 
-
 # Partie principale : démarrage des deux rôles
 def main():
     analyseur = argparse.ArgumentParser(description="SAE3.02 - Client/serveur avec OSM")
@@ -34,7 +33,6 @@ def main():
     application.aboutToQuit.connect(simulation.arreter)
     fenetre = InterfaceAvecOSM(simulation)
     return application.exec()
-
 
 if __name__ == "__main__":
     sys.exit(main())

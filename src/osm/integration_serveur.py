@@ -112,7 +112,6 @@ class SimulationAvecOSM:
                 "feux_osm": feux,
             }
 
-
             if self.__numero_image <= 12 or self.__numero_image % 40 == 0:
                 etat["plan_osm_zip"] = self.__plan_zip
             return etat

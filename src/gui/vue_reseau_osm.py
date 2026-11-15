@@ -15,7 +15,6 @@ COULEURS = {
     'darkGreen': '#4a603c'
 }
 
-
 # Partie principale : affichage
 def dessiner_reseau_osm(painter, simulation, clignotant_tick):
     dessin = simulation.get_dessin()
@@ -31,11 +30,9 @@ def dessiner_reseau_osm(painter, simulation, clignotant_tick):
     for a, b in dessin['segments']:
         painter.drawLine(QPointF(*a), QPointF(*b))
 
-
     painter.setPen(QPen(QColor('#bfc3c3'), 1, Qt.PenStyle.DashLine))
     for a, b in dessin['segments']:
         painter.drawLine(QPointF(*a), QPointF(*b))
-
 
     couleurs_feux = {'vert':'#44ec56', 'orange':'#fec442', 'rouge':'#fa4444'}
     for noeud, precedent, (x,y) in dessin['feux']:

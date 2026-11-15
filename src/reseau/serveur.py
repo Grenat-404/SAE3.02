@@ -72,7 +72,6 @@ class SessionClient(threading.Thread):
             with self.__verrou:
                 self.__reponses.append(encoder(reponse))
 
-
         elif message.get("type") == "reinitialiser":
             self.__serveur.demander_reinitialisation()
 
@@ -154,7 +153,6 @@ class ServeurReseau:
         self.__udp = None
         self.__threads = []
 
-
         self.__taille_ecran = None
         self.__reinitialisation_demandee = threading.Event()
 
@@ -180,7 +178,6 @@ class ServeurReseau:
                 self.__simulation = Simulation(largeur, hauteur)
 
                 print(f"[SERVEUR] Simulation originale : {largeur} x {hauteur}", flush=True)
-
 
     def demander_reinitialisation(self):
         self.__reinitialisation_demandee.set()
@@ -279,7 +276,6 @@ class ServeurReseau:
 
         while self.actif():
 
-
             if self.__reinitialisation_demandee.is_set():
                 self.__reinitialisation_demandee.clear()
 
@@ -287,7 +283,6 @@ class ServeurReseau:
                     if (self.__simulation is not None and self.__taille_ecran is not None):
 
                         self.__simulation.arreter()
-
 
                         self.__simulation = Simulation(*self.__taille_ecran)
 

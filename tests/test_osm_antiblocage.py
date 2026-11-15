@@ -21,7 +21,6 @@ class SimulationAntibouchonTests(unittest.TestCase):
 
     def test_itineraires_urgence_fixes_trafic_aleatoire(self):
 
-
         premier = self.simulation()
         second = self.simulation()
         configurations = [
@@ -86,12 +85,10 @@ class SimulationAntibouchonTests(unittest.TestCase):
     def test_repartition_par_zones(self):
         sim = self.simulation()
 
-
         groupes = {0: ["nord"], 4: ["centre"], 8: ["sud"]}
         occupation = [20, 0, 0, 0, 3, 0, 0, 0, 0]
         tirages = [ sim._SimulationReseauOSM__choisir_noeud_reparti(groupes, occupation) for _ in range(400) ]
         self.assertGreater(tirages.count("sud"), tirages.count("nord") * 4)
-
 
         self.assertNotEqual(
             sim._SimulationReseauOSM__zone_ecran(200, 160),
@@ -133,7 +130,6 @@ class SimulationAntibouchonTests(unittest.TestCase):
                 sim = SimulationReseauOSM(str(fichier), centre, 1440, 900, graine=8)
                 for _ in range(60):
                     sim.avancer()
-
 
 if __name__ == "__main__":
     unittest.main()

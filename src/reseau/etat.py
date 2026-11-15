@@ -14,7 +14,6 @@ def rectangle(objet):
         "hauteur": objet.get_hauteur(),
     }
 
-
 # Partie principale : export JSON
 def construire_etat(simulation):
     parking = simulation.get_parking()

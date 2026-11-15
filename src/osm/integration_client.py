@@ -52,7 +52,6 @@ class SimulationDistanteAvecOSM(SimulationDistante):
         reseau._ClientReseau__actif.clear()
         reseau._ClientReseau__connecte.clear()
 
-
         connexion = reseau._ClientReseau__socket
         if connexion is not None:
             try:
@@ -136,7 +135,6 @@ class InterfaceAvecOSM(Interface):
         """Dessine les gyrophares du carrefour prédéfini, sans modifier l'interface originale."""
         super()._Interface__dessiner_vehicule(painter, vehicule)
 
-
         service = vehicule.get_type_service() if hasattr(vehicule, "get_type_service") else None
         if service not in ("ambulance", "pompier", "police"):
             return
@@ -147,7 +145,6 @@ class InterfaceAvecOSM(Interface):
         hauteur = int(vehicule.get_hauteur())
         taille = 5
         espace = 2
-
 
         if vehicule.get_direction() in ("droite", "gauche"):
             x_bleu = x + (largeur - taille) // 2

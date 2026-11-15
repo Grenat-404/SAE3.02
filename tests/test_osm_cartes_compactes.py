@@ -10,7 +10,6 @@ from pathlib import Path
 from src.osm.reseau_routier import ReseauRoutier
 from src.osm.simulation_reseau_osm import SimulationReseauOSM
 
-
 DOSSIER_CARTES = Path(__file__).resolve().parents[1] / "data" / "maps"
 
 
@@ -36,7 +35,6 @@ class CartesOSMTests(unittest.TestCase):
                 for i, premier in enumerate(centres):
                     for autre in centres[i + 1:]:
                         self.assertGreaterEqual(reseau.distance_metres(premier["id"], autre["id"]), 75 - 0.0001,)
-
 
 if __name__ == "__main__":
     unittest.main()

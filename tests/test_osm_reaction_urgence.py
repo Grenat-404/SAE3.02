@@ -11,7 +11,6 @@ from pathlib import Path
 from src.osm.reseau_routier import ReseauRoutier
 from src.osm.simulation_reseau_osm import SimulationReseauOSM, VoitureReseau
 
-
 CARTE = Path(__file__).resolve().parents[1] / "data" / "maps" / "demo_grille_multicarrefours.osm"
 
 
@@ -105,7 +104,6 @@ class ReactionUrgenceOSMTests(unittest.TestCase):
             sim._SimulationReseauOSM__reagir_aux_urgences()
         decalage = normale.get_decalage()
 
-
         positions = sim._SimulationReseauOSM__positions
         normale.changer_chemin(["12", "13", "24", "35", "46"], positions)
         normale.set_avancement(normale.distance_noeud(1) + 4)
@@ -114,7 +112,6 @@ class ReactionUrgenceOSMTests(unittest.TestCase):
         self.assertGreaterEqual(normale.get_decalage(), decalage)
         self.assertIn(normale, sim._SimulationReseauOSM__cedent_urgence)
         urgence.set_avancement(200)
-
 
         sim._SimulationReseauOSM__reagir_aux_urgences()
         self.assertNotIn(normale, sim._SimulationReseauOSM__cedent_urgence)
@@ -139,7 +136,6 @@ class ReactionUrgenceOSMTests(unittest.TestCase):
         sim._SimulationReseauOSM__agents = [normale]
         sim._SimulationReseauOSM__reagir_aux_urgences()
         self.assertEqual(normale.get_decalage(), 0)
-
 
 if __name__ == "__main__":
     unittest.main()

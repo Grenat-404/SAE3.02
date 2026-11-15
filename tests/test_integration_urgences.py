@@ -65,6 +65,5 @@ class IntegrationUrgencesTest(unittest.TestCase):
         simulation.avancer()
         self.assertEqual(vehicule.get_clignotant(), "gauche")
 
-
 if __name__ == "__main__":
     unittest.main()

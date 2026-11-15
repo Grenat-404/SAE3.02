@@ -111,7 +111,6 @@ class ReseauRoutier:
                 'feu': self.a_feu_osm(identifiant),
             })
 
-
         candidats.sort(key=lambda c: (-c['nb_rues'], -int(c['feu']), -c['nb_branches'], c['nom'], c['id']))
 
         retenus = []

@@ -73,7 +73,6 @@ class SimulationDistante(QObject):
     # Partie principale : communication ou simulation
     def avancer(self):
 
-
         with self.__verrou:
             self.__etat_affiche = self.__dernier_etat
 

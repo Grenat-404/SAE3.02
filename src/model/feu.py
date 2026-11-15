@@ -11,7 +11,6 @@ class Feu:
         self.__orientation = orientation
         self.__inverse = inverse
 
-
     def get_x(self):
         return self.__x
 

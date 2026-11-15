@@ -21,7 +21,6 @@ class FenetreUrgence(QWidget):
 
         self.setFixedWidth(self.__largeur_ouverte)
 
-
         self.setObjectName("panneauUrgence")
 
         self.setStyleSheet("""
@@ -105,7 +104,6 @@ class FenetreUrgence(QWidget):
 
         layout_principal.setSpacing(8)
 
-
         self.__bouton_reduire = QPushButton("▶")
 
         self.__bouton_reduire.setObjectName("boutonReduire")
@@ -131,18 +129,15 @@ class FenetreUrgence(QWidget):
 
         layout_principal.addLayout(layout_bouton)
 
-
         self.__contenu = QWidget()
 
         layout = QVBoxLayout(self.__contenu)
 
         layout.setContentsMargins(0, 0, 0, 0)
 
-
         layout.setSpacing(10)
 
         layout_principal.addWidget(self.__contenu)
-
 
         bloc_urgence = QFrame()
         bloc_urgence.setObjectName("bloc")
@@ -158,7 +153,6 @@ class FenetreUrgence(QWidget):
         titre_urgence.setObjectName("titreBloc")
 
         layout_urgence.addWidget(titre_urgence)
-
 
         layout_urgence.addWidget(QLabel("Type d'urgence :"))
 
@@ -176,7 +170,6 @@ class FenetreUrgence(QWidget):
 
         layout_urgence.addWidget(self.__combo_type_urgence)
 
-
         layout_urgence.addWidget(QLabel("Niveau d'urgence :"))
 
         self.__spin_priorite = QSpinBox()
@@ -188,7 +181,6 @@ class FenetreUrgence(QWidget):
         layout_urgence.addWidget(self.__spin_priorite)
 
         layout.addWidget(bloc_urgence)
-
 
         bloc_vehicule = QFrame()
         bloc_vehicule.setObjectName("bloc")
@@ -205,7 +197,6 @@ class FenetreUrgence(QWidget):
 
         layout_vehicule.addWidget(titre_vehicule)
 
-
         layout_vehicule.addWidget(QLabel("Type de véhicule :"))
 
         self.__combo_service = QComboBox()
@@ -219,7 +210,6 @@ class FenetreUrgence(QWidget):
         self.__combo_service.addItem("Char d'assaut", "char")
 
         layout_vehicule.addWidget(self.__combo_service)
-
 
         layout_vehicule.addWidget(QLabel("Le véhicule vient de :"))
 
@@ -235,7 +225,6 @@ class FenetreUrgence(QWidget):
 
         layout_vehicule.addWidget(self.__combo_provenance)
 
-
         layout_vehicule.addWidget(QLabel("Direction voulue :"))
 
         self.__combo_destination = QComboBox()
@@ -244,7 +233,6 @@ class FenetreUrgence(QWidget):
         self.__combo_destination.addItem("Tourner à droite", "droite")
         layout_vehicule.addWidget(self.__combo_destination)
 
-
         bouton_ajouter = QPushButton("Ajouter le véhicule")
 
         bouton_ajouter.clicked.connect(self.__ajouter_vehicule)
@@ -252,7 +240,6 @@ class FenetreUrgence(QWidget):
         layout_vehicule.addWidget(bouton_ajouter)
 
         layout.addWidget(bloc_vehicule)
-
 
         bloc_liste = QFrame()
         bloc_liste.setObjectName("bloc")
@@ -269,20 +256,17 @@ class FenetreUrgence(QWidget):
 
         layout_liste.addWidget(titre_liste)
 
-
         self.__liste_vehicules = QListWidget()
 
         self.__liste_vehicules.setMinimumHeight(180)
 
         layout_liste.addWidget(self.__liste_vehicules)
 
-
         bouton_retirer = QPushButton("Retirer le véhicule sélectionné")
 
         bouton_retirer.clicked.connect(self.__retirer_vehicule)
 
         layout_liste.addWidget(bouton_retirer)
-
 
         bouton_declencher = QPushButton("Déclencher l'urgence")
 
@@ -292,11 +276,9 @@ class FenetreUrgence(QWidget):
 
         layout.addWidget(bloc_liste)
 
-
         bouton_reset = QPushButton("↻ Réinitialiser la simulation")
         bouton_reset.clicked.connect(self.__reinitialiser_simulation)
         layout.addWidget(bouton_reset)
-
 
         self.__label_message = QLabel("")
 

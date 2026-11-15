@@ -100,6 +100,5 @@ class TestReseau(unittest.TestCase):
             fil.join(timeout=2)
             module_serveur.Simulation = original
 
-
 if __name__ == "__main__":
     unittest.main()

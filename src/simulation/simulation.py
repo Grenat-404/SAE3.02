@@ -93,7 +93,6 @@ class Simulation:
         self.__largeur_ecran = largeur_ecran
         self.__hauteur_ecran = hauteur_ecran
 
-
         self.__passages_pietons = {
             "ouest": { "x": ix - 67, "y": iy, "largeur": 55, "hauteur": ih, "axe": "y" },
             "est": { "x": ix + il + 12, "y": iy, "largeur": 55, "hauteur": ih, "axe": "y" },
@@ -139,7 +138,6 @@ class Simulation:
     def get_parking(self):
         return self.__parking
 
-
     def get_pietons(self):
         with self.__verrou:
             return [ dict(pieton) for groupe in self.__pietons.values() for pieton in groupe ]
@@ -176,7 +174,6 @@ class Simulation:
 
         return feux_rouges and self.__passage_libre(passage)
 
-
     # Partie principale : passages piétons
     def __mettre_a_jour_pietons(self):
 
@@ -189,22 +186,17 @@ class Simulation:
             groupe = self.__pietons[nom]
             axe = passage["axe"]
 
-
             if len(groupe) < maximum_pietons:
 
                 if random.randint(1, frequence) == 1:
 
-
                     sens = random.choice([-1, 1])
-
 
                     deja_en_attente = any(p["etat"] == "attente" and p["sens"] == sens for p in groupe)
 
                     if not deja_en_attente:
 
-
                         if axe == "y":
-
 
                             decalage = -12 if sens == 1 else 12
 
@@ -214,7 +206,6 @@ class Simulation:
                                 y = passage["y"] - 8
                             else:
                                 y = (passage["y"] + passage["hauteur"] + 8)
-
 
                         else:
 
@@ -229,9 +220,7 @@ class Simulation:
 
                         groupe.append({ "x": x, "y": y, "sens": sens, "etat": "attente" })
 
-
             for pieton in groupe[:]:
-
 
                 if pieton["etat"] == "attente":
 
@@ -240,22 +229,17 @@ class Simulation:
 
                     pieton["etat"] = "traverse"
 
-
                 pieton[axe] += pieton["sens"] * vitesse
 
-
                 dimension = (passage["hauteur"] if axe == "y" else passage["largeur"])
-
 
                 if pieton["sens"] == 1:
                     termine = (pieton[axe] >= passage[axe] + dimension + 8)
                 else:
                     termine = (pieton[axe] <= passage[axe] - 8)
 
-
                 if termine:
                     groupe.remove(pieton)
-
 
     def __vehicule_bloque_par_pieton(self, vehicule, vitesse):
 
@@ -271,18 +255,15 @@ class Simulation:
 
         dx, dy = mouvements[direction]
 
-
         x = vehicule.get_x() + dx * vitesse
         y = vehicule.get_y() + dy * vitesse
 
         largeur = vehicule.get_largeur()
         hauteur = vehicule.get_hauteur()
 
-
         for nom, groupe in self.__pietons.items():
 
             passage = self.__passages_pietons[nom]
-
 
             if direction in ("droite", "gauche"):
                 if passage["axe"] != "y":
@@ -296,12 +277,10 @@ class Simulation:
             pl = passage["largeur"]
             ph = passage["hauteur"]
 
-
             for pieton in groupe:
 
                 if pieton["etat"] != "traverse":
                     continue
-
 
                 if (x < px + pl + 2 and x + largeur > px - 2 and y < py + ph + 2 and y + hauteur > py - 2):
                     return True
@@ -447,7 +426,6 @@ class Simulation:
         if attente > 90:
             ticks = 0
 
-        libre = True
         libre = True
         for autre in self.__vehicules:
             if autre is vehicule or autre.get_etat() != "route":
@@ -907,9 +885,7 @@ class Simulation:
         il = self.__intersection.get_largeur()
         ih = self.__intersection.get_hauteur()
 
-
         distance_arret = 75
-
 
         est_prioritaire = isinstance(vehicule, VehiculePrioritaire)
         prioritaire_actif = (est_prioritaire and self.__est_prioritaire_actif(vehicule))
@@ -929,10 +905,8 @@ class Simulation:
             if self.__direction_prioritaire_active() == direction:
                 doit_bloquer = True
 
-
         if not doit_bloquer:
             return False
-
 
         if direction == "droite":
             position_arret = (ix - distance_arret - vehicule.get_largeur())
@@ -941,7 +915,6 @@ class Simulation:
                 vehicule.set_x(position_arret)
                 return True
 
-
         elif direction == "gauche":
             position_arret = ix + il + distance_arret
 
@@ -949,14 +922,12 @@ class Simulation:
                 vehicule.set_x(position_arret)
                 return True
 
-
         elif direction == "bas":
             position_arret = (iy - distance_arret - vehicule.get_hauteur())
 
             if (vehicule.get_y() <= position_arret and vehicule.get_y() + vitesse >= position_arret):
                 vehicule.set_y(position_arret)
                 return True
-
 
         elif direction == "haut":
             position_arret = iy + ih + distance_arret
@@ -1049,9 +1020,7 @@ class Simulation:
     def __gerer_direction(self, vehicule):
         doit_s_arreter = False
 
-
         if vehicule.get_direction() == "droite":
-
 
             if vehicule.get_destination() == "haut":
                 centre_voie_haut = (self.__intersection.get_x() + self.__intersection.get_largeur() * 3 // 4)
@@ -1064,7 +1033,6 @@ class Simulation:
                     else:
                         doit_s_arreter = True
 
-
             if vehicule.get_destination() == "bas":
                 centre_voie_bas = (self.__intersection.get_x() + self.__intersection.get_largeur() // 4)
 
@@ -1076,9 +1044,7 @@ class Simulation:
                     else:
                         doit_s_arreter = True
 
-
         elif vehicule.get_direction() == "gauche":
-
 
             if vehicule.get_destination() == "haut":
                 centre_voie_haut = (self.__intersection.get_x() + self.__intersection.get_largeur() * 3 // 4)
@@ -1091,7 +1057,6 @@ class Simulation:
                     else:
                         doit_s_arreter = True
 
-
             if vehicule.get_destination() == "bas":
                 centre_voie_bas = (self.__intersection.get_x() + self.__intersection.get_largeur() // 4)
 
@@ -1103,9 +1068,7 @@ class Simulation:
                     else:
                         doit_s_arreter = True
 
-
         elif vehicule.get_direction() == "bas":
-
 
             if vehicule.get_destination() == "droite":
                 centre_voie_droite = (self.__intersection.get_y() + self.__intersection.get_hauteur() * 3 // 4)
@@ -1118,7 +1081,6 @@ class Simulation:
                     else:
                         doit_s_arreter = True
 
-
             if vehicule.get_destination() == "gauche":
                 centre_voie_gauche = (self.__intersection.get_y() + self.__intersection.get_hauteur() // 4)
 
@@ -1130,9 +1092,7 @@ class Simulation:
                     else:
                         doit_s_arreter = True
 
-
         elif vehicule.get_direction() == "haut":
-
 
             if vehicule.get_destination() == "droite":
                 centre_voie_droite = (self.__intersection.get_y() + self.__intersection.get_hauteur() * 3 // 4)
@@ -1144,7 +1104,6 @@ class Simulation:
                         vehicule.set_destination(None)
                     else:
                         doit_s_arreter = True
-
 
             if vehicule.get_destination() == "gauche":
                 centre_voie_gauche = (self.__intersection.get_y() + self.__intersection.get_hauteur() // 4)
@@ -1201,7 +1160,6 @@ class Simulation:
             else:
                 self.__retenus_entree.discard(vehicule)
 
-
             if self.__vehicule_bloque_par_pieton(vehicule, vitesse):
                 doit_s_arreter = True
 
@@ -1209,7 +1167,6 @@ class Simulation:
                 if vehicule.get_veut_se_garer() and vehicule.get_direction() == "gauche" and self.__entrer_parking(vehicule):
                     return
                 vehicule.avancer(vitesse)
-
 
     # Partie principale : communication ou simulation
     def avancer(self):

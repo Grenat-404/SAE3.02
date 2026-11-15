@@ -22,13 +22,11 @@ class Vehicule:
         self.__clignotant = None
         self.__temps_clignotant = 0
 
-
         self.__ecartement_urgence = False
         self.__decalage_lateral = 0
 
         self.__decalage_max = 28
         self.__vitesse_decalage = 2
-
 
         if direction in ("droite", "gauche"):
             self.__position_laterale_reference = y

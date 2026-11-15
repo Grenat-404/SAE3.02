@@ -24,7 +24,6 @@ def decoder(ligne):
         raise ValueError("Le message JSON doit être un objet")
     return message
 
-
 # Partie principale : priorité et véhicules d'urgence
 def verifier_urgence(message):
     """Valider les valeurs AVANT l'appel au moteur original."""

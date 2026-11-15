@@ -88,6 +88,5 @@ class TestSecoursEtEcartement(unittest.TestCase):
         self.assertEqual(devant.get_x(), 303)
         self.assertGreaterEqual(devant.get_x() - derriere.get_x(), 40)
 
-
 if __name__ == "__main__":
     unittest.main()

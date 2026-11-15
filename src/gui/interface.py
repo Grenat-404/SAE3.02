@@ -67,7 +67,6 @@ class Interface(QWidget):
         largeur_phare = 5
         hauteur_phare = 6
 
-
         if direction == "droite":
             painter.drawRect(x + largeur - 11, y + 3, 8, hauteur - 6)
 
@@ -150,13 +149,11 @@ class Interface(QWidget):
 
         painter.setPen(Qt.PenStyle.NoPen)
 
-
     def __dessiner_passages_pietons(self, painter, intersection):
         x = int(intersection.get_x())
         y = int(intersection.get_y())
         largeur = int(intersection.get_largeur())
         hauteur = int(intersection.get_hauteur())
-
 
         longueur = 55
         distance = 12
@@ -164,14 +161,12 @@ class Interface(QWidget):
         espacement = 13
         marge = 5
 
-
         x_ouest = x - distance - longueur
         x_est = x + largeur + distance
         y_nord = y - distance - longueur
         y_sud = y + hauteur + distance
 
         painter.setPen(Qt.PenStyle.NoPen)
-
 
         painter.setBrush(Qt.GlobalColor.darkGray)
 
@@ -181,32 +176,25 @@ class Interface(QWidget):
         for py in (y_nord, y_sud):
             painter.drawRect(x, py, largeur, longueur)
 
-
         painter.setBrush(QColor(245, 245, 245))
-
 
         for decalage in range(marge, hauteur - marge - largeur_bande + 1, espacement):
             for px in (x_ouest, x_est):
                 painter.drawRect(px, y + decalage, longueur, largeur_bande)
 
-
         for decalage in range(marge, largeur - marge - largeur_bande + 1, espacement):
             for py in (y_nord, y_sud):
                 painter.drawRect(x + decalage, py, largeur_bande, longueur)
-
 
     def __dessiner_pietons(self, painter):
         for pieton in self.simulation.get_pietons():
             x = int(pieton["x"])
             y = int(pieton["y"])
 
-
             painter.setPen(QPen(QColor(20, 20, 20), 1))
-
 
             painter.setBrush(QColor(255, 180, 50))
             painter.drawEllipse(x - 6, y - 6, 12, 12)
-
 
             painter.setBrush(QColor(45, 45, 45))
             painter.drawEllipse(x - 3, y - 3, 6, 6)
@@ -221,12 +209,10 @@ class Interface(QWidget):
 
         painter.setPen(Qt.PenStyle.NoPen)
 
-
         painter.setBrush(Qt.GlobalColor.darkGray)
 
         for route in self.simulation.get_routes():
             painter.drawRect(int(route.get_x()), int(route.get_y()), int(route.get_largeur()), int(route.get_hauteur()),)
-
 
         pen = QPen(Qt.GlobalColor.white, 3)
         painter.setPen(pen)
@@ -237,9 +223,7 @@ class Interface(QWidget):
         largeur_ecran = self.width()
         hauteur_ecran = self.height()
 
-
         distance_arret = 75
-
 
         x_arret_droite = intersection.get_x() - distance_arret
         painter.drawLine(
@@ -249,14 +233,11 @@ class Interface(QWidget):
             int(intersection.get_y() + intersection.get_hauteur())
         )
 
-
         x_arret_gauche = (intersection.get_x() + intersection.get_largeur() + distance_arret)
         painter.drawLine(int(x_arret_gauche), int(intersection.get_y()), int(x_arret_gauche), int(centre_y))
 
-
         y_arret_bas = intersection.get_y() - distance_arret
         painter.drawLine(int(intersection.get_x()), int(y_arret_bas), int(centre_x), int(y_arret_bas))
-
 
         y_arret_haut = (intersection.get_y() + intersection.get_hauteur() + distance_arret)
         painter.drawLine(
@@ -265,7 +246,6 @@ class Interface(QWidget):
             int(intersection.get_x() + intersection.get_largeur()),
             int(y_arret_haut)
         )
-
 
         pen_pointille = QPen(Qt.GlobalColor.white, 2, Qt.PenStyle.DashLine)
         painter.setPen(pen_pointille)
@@ -280,9 +260,7 @@ class Interface(QWidget):
 
         painter.setPen(Qt.PenStyle.NoPen)
 
-
         self.__dessiner_passages_pietons(painter, intersection)
-
 
         for feu in self.simulation.get_feux():
 
@@ -329,12 +307,10 @@ class Interface(QWidget):
             painter.setBrush(Qt.GlobalColor.green if feu.get_etat() == "vert" else Qt.GlobalColor.darkGreen)
             painter.drawEllipse(pos_vert[0], pos_vert[1], 11, 11)
 
-
         parking = self.simulation.get_parking()
         painter.setBrush(Qt.GlobalColor.darkGray)
         for voie in parking.get_voies():
             painter.drawRect(int(voie.get_x()), int(voie.get_y()), int(voie.get_largeur()), int(voie.get_hauteur()))
-
 
         pen_parking = QPen(Qt.GlobalColor.white, 2)
         pen_parking.setCapStyle(Qt.PenCapStyle.FlatCap)
@@ -348,7 +324,6 @@ class Interface(QWidget):
             painter.drawLine(x1, y1, x1, y2)
             painter.drawLine(x2, y1, x2, y2)
 
-
         xe, ye = parking.get_entree()
         xs, ys = parking.get_sortie()
         painter.drawLine(xe, ye - 10, xe, ye - 35)
@@ -358,13 +333,11 @@ class Interface(QWidget):
         painter.drawLine(xs, ys - 10, xs - 6, ys - 17)
         painter.drawLine(xs, ys - 10, xs + 6, ys - 17)
 
-
         x1, x2, y_arret = parking.get_ligne_arret_sortie()
         pen_arret = QPen(Qt.GlobalColor.white, 3)
         pen_arret.setCapStyle(Qt.PenCapStyle.FlatCap)
         painter.setPen(pen_arret)
         painter.drawLine(x1, y_arret, x2, y_arret)
-
 
         painter.setPen(QPen(Qt.GlobalColor.white))
         painter.setFont(QFont("Arial", 11))
@@ -378,7 +351,6 @@ class Interface(QWidget):
 
         painter.setPen(Qt.PenStyle.NoPen)
 
-
         for vehicule in self.simulation.get_vehicules():
             est_char = hasattr(vehicule, "get_type_service") and vehicule.get_type_service() == "char"
 
@@ -386,7 +358,6 @@ class Interface(QWidget):
                 self.__dessiner_char(painter, vehicule)
             else:
                 self.__dessiner_vehicule(painter, vehicule)
-
 
         self.__dessiner_pietons(painter)
 

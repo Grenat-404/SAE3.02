@@ -34,7 +34,6 @@ class Parking:
         self.__sortie = (x_sortie + largeur_voie // 2, y_bas)
         self.__ligne_arret_sortie = (x_sortie, x_sortie + largeur_voie, y_bas + trottoir - 3)
 
-
         allee = hauteur - 2 * place_h
         y_milieu = y + hauteur / 2
         self.__y_est = y_milieu + allee / 4

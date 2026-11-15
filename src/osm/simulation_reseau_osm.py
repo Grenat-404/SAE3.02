@@ -141,13 +141,10 @@ class SimulationReseauOSM:
         self.__attente_de = {}
         self.__cedent_urgence = set()
 
-
         self.__cedent_memo = {}
         self.__generateur = random.Random(graine)
 
-
         self.__trajets_urgences = {}
-
 
         self.__entrees = []
         self.__sorties = []
@@ -168,7 +165,6 @@ class SimulationReseauOSM:
 
         if self.__carte_compacte:
 
-
             voisins = {}
             for a, b in self.__reseau.get_segments():
                 voisins.setdefault(a, set()).add(b)
@@ -183,7 +179,6 @@ class SimulationReseauOSM:
                 "les véhicules hors écran. Télécharge une zone de 1 à 2 km."
             )
 
-
         self.__entrees_proches = []
         if not self.__carte_compacte:
             for noeud in self.__entrees:
@@ -193,11 +188,9 @@ class SimulationReseauOSM:
                 if max(hors_x, hors_y) <= 115:
                     self.__entrees_proches.append(noeud)
 
-
         self.__groupes_entrees = self.__grouper_zones(self.__entrees)
         self.__groupes_entrees_proches = self.__grouper_zones(self.__entrees_proches)
         self.__groupes_sorties = self.__grouper_zones(self.__sorties)
-
 
         if not self.__choisir_itineraire():
             raise ValueError(
@@ -231,7 +224,6 @@ class SimulationReseauOSM:
                 if suivant in self.__intersections:
                     entrants.setdefault(suivant, []).append(precedent)
         for noeud in self.__intersections:
-
 
             if not self.__reseau.a_feu_osm(noeud):
                 continue
@@ -276,7 +268,6 @@ class SimulationReseauOSM:
         largeur = max(1, self.__limite_droite)
         hauteur = max(1, self.__hauteur - 100)
 
-
         colonne = min(2, max(0, int(3 * x / largeur)))
         ligne = min(2, max(0, int(3 * (y - 100) / hauteur)))
         return ligne * 3 + colonne
@@ -320,7 +311,6 @@ class SimulationReseauOSM:
             chemin = self.__trajets_urgences[cle]
             return list(chemin) if chemin is not None else None
 
-
         angles_origine = { 'droite': math.pi, 'gauche': 0.0, 'bas': -math.pi / 2, 'haut': math.pi / 2 }
         angles_sortie = { 'droite': 0.0, 'gauche': math.pi, 'bas': math.pi / 2, 'haut': -math.pi / 2 }
         cx, cy = self.__positions[self.__centre_id]
@@ -335,7 +325,6 @@ class SimulationReseauOSM:
             a = math.atan2(y - cy, x - cx)
             return abs(math.atan2(math.sin(a - angle), math.cos(a - angle)))
 
-
         entrees = sorted(
             self.__entrees,
             key=lambda n: (ecart_angle(n, angle_entree), math.dist(self.__positions[n], (cx, cy)), n)
@@ -345,11 +334,9 @@ class SimulationReseauOSM:
             key=lambda n: (ecart_angle(n, angle_sortie), math.dist(self.__positions[n], (cx, cy)), n)
         )
 
-
         avant_cache = {}
         sortie_cache = {}
         for maximum in (12, 36):
-
 
             for tout_droit_souple in (False, True):
                 if souhaite is not None and tout_droit_souple:
@@ -400,7 +387,6 @@ class SimulationReseauOSM:
     def __choisir_itineraire(self, provenance=None, urgence=False, souhaite=None):
         if urgence:
             return self.__itineraire_urgence_fixe(provenance, souhaite)
-
 
         occupation = self.__occupation_zones()
         paires = []
@@ -458,7 +444,6 @@ class SimulationReseauOSM:
         numero = self.__prochain_id
         self.__prochain_id += 1
 
-
         trajets = []
         for config in vehicules:
             chemin = self.__choisir_itineraire(
@@ -495,7 +480,6 @@ class SimulationReseauOSM:
             noeud = chemin[j]
             if noeud not in self.__intersections or distance < 20:
                 continue
-
 
             if (noeud, chemin[j + 1]) not in morceaux_urgence:
                 continue
@@ -597,7 +581,6 @@ class SimulationReseauOSM:
 
                 if morceau in approches:
 
-
                     repere = (approches[morceau] + voiture.get_avancement() - voiture.distance_noeud(indice - 1))
                     distance = repere - urgence.get_avancement()
                     deja_rangee = urgence in memo_precedent.get(voiture, {})
@@ -608,11 +591,9 @@ class SimulationReseauOSM:
 
                 elif urgence in memo_precedent.get(voiture, {}):
 
-
                     ancien_repere = memo_precedent[voiture][urgence]
                     if urgence.get_avancement() <= ancien_repere + 40:
                         nouveau_memo.setdefault(voiture, {})[urgence] = ancien_repere
-
 
                 if repere is None:
                     for j in range(indice + 1, len(chemin)):
@@ -633,7 +614,6 @@ class SimulationReseauOSM:
         for voiture in normales:
             doit_ceder = voiture in self.__cedent_urgence
             if doit_ceder:
-
 
                 if voiture.get_decalage() > 0 or not self.__pres_intersection(voiture):
                     voiture.ajuster_decalage(10.0)
@@ -685,7 +665,6 @@ class SimulationReseauOSM:
                 self.__attente_de[voiture] = autre
                 return False
 
-
         chemin = voiture.get_chemin()
         for j in range(indice + 1, len(chemin) - 1):
             distance = voiture.distance_noeud(j) - centre
@@ -736,7 +715,6 @@ class SimulationReseauOSM:
             devant = dx * ux + dy * uy
             lateral = abs(dx * uy - dy * ux)
 
-
             if -4 < devant < 25 and lateral < 8:
                 self.__attente_de[voiture] = autre
                 return False
@@ -762,13 +740,11 @@ class SimulationReseauOSM:
                 return cible, None
             urgence = self.__urgences_noeud.get(noeud)
 
-
             autorise = (not self.__reseau.a_feu_osm(noeud) or self.get_etat_feu(noeud, precedent) == 'vert')
             if voiture.est_prioritaire():
                 autorise = urgence is None or urgence is voiture or (
                     urgence.get_urgence_id() == voiture.get_urgence_id())
             elif urgence is not None:
-
 
                 autorise = self.__devant_urgence(voiture, urgence, noeud, precedent)
             if verrou is not None and verrou is not voiture:
@@ -781,17 +757,14 @@ class SimulationReseauOSM:
                     cible = voiture.get_avancement()
                 return cible, None
 
-
             if voiture.get_avancement() <= stop < cible:
                 if not self.__sortie_libre(voiture, i):
                     return min(cible, stop), None
-
 
             if voiture.get_avancement() <= stop < cible:
                 a_reserver = noeud
             elif stop < voiture.get_avancement() < centre + 24 and verrou is None:
                 a_reserver = noeud
-
 
             return cible, a_reserver
         return cible, None
@@ -800,7 +773,6 @@ class SimulationReseauOSM:
     def avancer(self):
         self.__tick += 1
         self.__attente_de.clear()
-
 
         arretes = sum(self.__immobilisation.get(v, 0) > 80 for v in self.__agents)
         taux = arretes / max(1, len(self.__agents))
@@ -823,7 +795,6 @@ class SimulationReseauOSM:
         for voiture in sorted(self.__agents, key=lambda a: a.get_avancement(), reverse=True):
             ancien = voiture.get_avancement()
             vitesse = voiture.get_vitesse()
-
 
             if (voiture in self.__cedent_urgence
                     and voiture.get_decalage() >= 7
@@ -860,7 +831,6 @@ class SimulationReseauOSM:
         self.__immobilisation = { v: self.__immobilisation.get(v, 0) for v in self.__agents }
 
         self.__cedent_memo = { v: suivis for v, suivis in self.__cedent_memo.items() if v in self.__agents }
-
 
         if self.__tick % 90 == 0:
             candidats = [
