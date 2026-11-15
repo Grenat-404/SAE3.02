@@ -8,6 +8,7 @@ import sys
 
 # Partie principale : démarrage des deux rôles
 def main() -> int:
+    """Point d'entrée principal du programme."""
     analyseur = argparse.ArgumentParser(description="SAE3.02 - Client/serveur avec OSM")
     analyseur.add_argument("--role", required=True, choices=("serveur", "client"))
     role = analyseur.parse_args().role
