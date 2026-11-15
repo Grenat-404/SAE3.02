@@ -46,12 +46,14 @@ class SimulationAvecOSM:
         self.__demarrer_statistiques()
 
     def __observer_vehicules(self) -> None:
+        """Exécute le traitement « observer vehicules »."""
         nombre = len(self.__moteur.get_vehicules())
         self.__somme_vehicules += nombre
         self.__nombre_releves += 1
         self.__maximum_vehicules = max(self.__maximum_vehicules, nombre)
 
     def __demarrer_statistiques(self) -> None:
+        """Exécute le traitement « demarrer statistiques »."""
         self.__simulation_id = self.__bdd.nouvelle_simulation(
             "classique" if self.__carte is None else "osm",
             self.__carte, self.__centre
@@ -64,6 +66,7 @@ class SimulationAvecOSM:
         self.__observer_vehicules()
 
     def __terminer_statistiques(self) -> None:
+        """Exécute le traitement « terminer statistiques »."""
         if self.__simulation_id is None:
             return
         duree = time.monotonic() - self.__debut
@@ -115,10 +118,12 @@ class SimulationAvecOSM:
             print("[SERVEUR] Simulation :", selection, flush=True)
 
     def reinitialiser(self) -> None:
+        """Réinitialise le traitement « reinitialiser »."""
         with self.__verrou:
             self.changer_carte(self.__carte, self.__centre)
 
     def avancer(self) -> None:
+        """Exécute le traitement « avancer »."""
         with self.__verrou:
             self.__moteur.avancer()
             # Comptage léger en mémoire (aucune écriture SQL à chaque tick).
@@ -138,6 +143,7 @@ class SimulationAvecOSM:
 
     # Partie principale : traitement principal
     def exporter_etat_reseau(self) -> dict[str, Any]:
+        """Exécute le traitement « exporter etat reseau »."""
         with self.__verrou:
             if self.__carte is None:
 
@@ -174,6 +180,7 @@ class SimulationAvecOSM:
             return etat
 
     def arreter(self) -> None:
+        """Arrête le traitement « arreter »."""
         with self.__verrou:
             try:
                 self.__terminer_statistiques()
@@ -210,6 +217,7 @@ class ServeurAvecOSM(serveur_original.ServeurReseau):
     """Réutilise intégralement les sockets et les threads existants."""
 
     def __init__(self) -> None:
+        """Initialise l'objet et ses attributs."""
 
         serveur_original.SessionClient = SessionClientAvecOSM
         super().__init__()
@@ -228,6 +236,7 @@ class ServeurAvecOSM(serveur_original.ServeurReseau):
         simulation.changer_carte(carte, carrefour)
 
     def demander_reinitialisation(self) -> None:
+        """Exécute le traitement « demander reinitialisation »."""
         simulation = self.simulation()
         if isinstance(simulation, SimulationAvecOSM):
             simulation.reinitialiser()
