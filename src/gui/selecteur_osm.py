@@ -14,6 +14,7 @@ class SelecteurOSM(QFrame):
     carrefour_charge = pyqtSignal(object)
 
     def __init__(self, parent: QWidget | None = None) -> None:
+        """Initialise l'objet et ses attributs."""
         super().__init__(parent)
         self.__cartes: dict[str, ReseauRoutier] = {}
         self.setStyleSheet('''
