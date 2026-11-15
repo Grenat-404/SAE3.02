@@ -27,22 +27,28 @@ class VehiculeDistantOSM:
         self.__donnees = donnees
 
     def position(self) -> tuple[float, float, float]:
+        """Exécute le traitement « position »."""
         return (self.__donnees["x"], self.__donnees["y"], self.__donnees["angle"])
 
     def get_service(self) -> str:
+        """Récupère le traitement « get service »."""
         return self.__donnees["service"]
 
     def get_couleur(self) -> str:
+        """Récupère le traitement « get couleur »."""
         return self.__donnees["couleur"]
 
     def get_clignotant(self) -> str:
+        """Récupère le traitement « get clignotant »."""
         return self.__donnees["clignotant"]
 
     def est_prioritaire(self) -> bool:
+        """Exécute le traitement « est prioritaire »."""
         return self.__donnees["prioritaire"]
 
 
 class SimulationDistanteAvecOSM(SimulationDistante):
+    """Représente SimulationDistanteAvecOSM dans l'application."""
     def __init__(self, largeur: int, hauteur: int) -> None:
         self.__selection: str | None = None
         self.__dessin: dict[str, Any] | None = None
@@ -66,6 +72,7 @@ class SimulationDistanteAvecOSM(SimulationDistante):
                 pass
 
     def avancer(self) -> None:
+        """Exécute le traitement « avancer »."""
         super().avancer()
         etat = self._SimulationDistante__etat_affiche
         if etat.get("mode") != "osm":
@@ -83,15 +90,18 @@ class SimulationDistanteAvecOSM(SimulationDistante):
                 pass
 
     def get_mode(self) -> str:
+        """Récupère le traitement « get mode »."""
         return self._SimulationDistante__etat_affiche.get("mode", "classique")
 
     def get_dessin(self) -> dict[str, Any]:
+        """Récupère le traitement « get dessin »."""
         return self.__dessin or {
             "segments": [], "intersections": {}, "feux": [],
             "limite_droite": 1, "hauteur": 1,
         }
 
     def get_vehicules(self) -> list[Any]:
+        """Récupère le traitement « get vehicules »."""
         if self.get_mode() == "osm":
             return [ VehiculeDistantOSM(d) for d in self._SimulationDistante__etat_affiche.get("agents_osm", []) ]
         return super().get_vehicules()
@@ -119,6 +129,7 @@ class SimulationDistanteAvecOSM(SimulationDistante):
 
 
 class InterfaceAvecOSM(Interface):
+    """Représente InterfaceAvecOSM dans l'application."""
     def __init__(self, simulation: SimulationDistanteAvecOSM) -> None:
         super().__init__(simulation)
         self.simulation: SimulationDistanteAvecOSM = simulation
