@@ -15,6 +15,7 @@ class BaseStatistiques:
     """Trois tables reliées par l'identifiant de simulation."""
 
     def __init__(self, chemin: str | Path | None = None) -> None:
+        """Initialise l'objet et ses attributs."""
         self.chemin = (Path(chemin) if chemin is not None
                        else Path(__file__).resolve().parents[1] / "data" / "statistiques.db")
         self.chemin.parent.mkdir(parents=True, exist_ok=True)
@@ -64,6 +65,7 @@ class BaseStatistiques:
 
     def nouvelle_simulation(self, mode: str, carte: str | None = None,
                            carrefour: str | None = None) -> int:
+        """Exécute le traitement « nouvelle simulation »."""
         with self._connexion() as db:
             curseur = db.execute("""
                 INSERT INTO simulations (date_debut, mode, carte, carrefour)
@@ -73,6 +75,7 @@ class BaseStatistiques:
 
     def terminer_simulation(self, simulation_id: int, duree: float,
                            maximum: int, moyenne: float, nombre_urgences: int) -> None:
+        """Exécute le traitement « terminer simulation »."""
         with self._connexion() as db:
             db.execute("""
                 UPDATE simulations SET date_fin = ? WHERE id = ?
@@ -87,6 +90,7 @@ class BaseStatistiques:
 
     def enregistrer_urgence(self, simulation_id: int, type_urgence: str,
                            priorite: int, nombre_vehicules: int) -> None:
+        """Exécute le traitement « enregistrer urgence »."""
         with self._connexion() as db:
             db.execute("""
                 INSERT INTO urgences
