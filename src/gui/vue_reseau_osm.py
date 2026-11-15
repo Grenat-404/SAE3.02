@@ -76,5 +76,4 @@ def dessiner_reseau_osm(painter: QPainter, simulation: SimulationDistanteAvecOSM
     painter.setFont(QFont('Arial', 11))
     painter.drawText(16, 135, f'Mode multicarrefours : {len(simulation.get_vehicules())} véhicules')
     painter.setFont(QFont('Arial', 9))
-    painter.drawText(16, painter.viewport().height() - 16,
-                     'Données © contributeurs OpenStreetMap — phases de feux simulées')
+    painter.drawText(16, painter.viewport().height() - 16, 'Données © contributeurs OpenStreetMap')

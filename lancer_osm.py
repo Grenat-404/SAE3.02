@@ -1,10 +1,8 @@
-# 
+"""
+Point d'entrée unique pour lancer la VM serveur ou la VM client.
+Conserve la découverte du serveur et le choix entre carrefour classique et OSM.
+"""
 from __future__ import annotations
----------------------------------------------------------------------------
-# SAÉ 3.02 | lancer_osm.py
-# Point d'entrée unique pour lancer la VM serveur ou la VM client.
-# Conserve la découverte du serveur et le choix entre carrefour classique et OSM.
-# ---------------------------------------------------------------------------
 import argparse
 import sys
 
