@@ -14,6 +14,7 @@ class FenetreUrgence(QWidget):
     """Représente FenetreUrgence dans l'application."""
 
     def __init__(self, simulation: SimulationDistante, parent: QWidget | None = None) -> None:
+        """Initialise l'objet et ses attributs."""
         super().__init__(parent)
         self.__simulation = simulation
         self.__vehicules_en_attente: list[VehiculeUrgence] = []
