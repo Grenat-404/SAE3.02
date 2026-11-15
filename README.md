@@ -1,6 +1,6 @@
-# SAÉ 3.02 — Simulation de trafic routier communicante
+# SAÉ 3.02 - Simulation de trafic routier communicante
 
-Projet réalisé dans le cadre de la **SAÉ 3.02 — Développer des applications communicantes** du BUT Réseaux & Télécommunications.
+Projet réalisé dans le cadre de la **SAÉ 3.02 - Développer des applications communicantes** du BUT Réseaux & Télécommunications.
 
 L'application simule la circulation routière autour d'un carrefour et permet de faciliter le passage de véhicules d'urgence. Elle fonctionne en architecture **client/serveur** : le serveur exécute la logique de la simulation et conserve les statistiques, tandis que le client affiche la simulation et permet de piloter les demandes d'urgence.
 
@@ -19,8 +19,6 @@ Le projet propose deux modes :
   - Jacques ROULIER
 - **Formation :** BUT Réseaux & Télécommunications
 - **Établissement :** IUT de Colmar
-- **SAÉ :** SAÉ 3.02 — Développer des applications communicantes
-- **Année universitaire :** 2026-2027
 
 ---
 
