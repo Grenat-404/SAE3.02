@@ -33,16 +33,32 @@ class EtatVehiculeOSM(TypedDict):
 
 
 class MoteurSimulation(Protocol):
-    """Représente MoteurSimulation dans l'application."""
-    def avancer(self) -> None: ...
-    def arreter(self) -> None: ...
-    def exporter_etat_reseau(self) -> dict[str, Any]: ...
-    def creer_urgence(self, type_urgence: str, niveau_priorite: int, vehicules: list[VehiculeUrgence]) -> int: ...
+    """Décrit l'interface commune aux moteurs de simulation."""
 
+    def avancer(self) -> None:
+        """Fait progresser la simulation d'un pas."""
+        ...
+
+    def arreter(self) -> None:
+        """Arrête proprement le moteur de simulation."""
+        ...
+
+    def exporter_etat_reseau(self) -> dict[str, Any]:
+        """Retourne l'état courant sérialisable envoyé aux clients."""
+        ...
+
+    def creer_urgence(
+        self,
+        type_urgence: str,
+        niveau_priorite: int,
+        vehicules: list[VehiculeUrgence],
+    ) -> int:
+        """Crée une demande d'urgence et retourne son identifiant."""
+        ...
 
 
 def encoder(message: dict[str, Any]) -> bytes:
-        """Fait avancer le traitement « avancer »."""
+    """Encode un message JSON sous forme de trame terminée par un saut de ligne."""
     return (json.dumps(message, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
 
 def decoder(ligne: bytes) -> dict[str, Any]:
