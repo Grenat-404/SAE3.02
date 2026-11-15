@@ -55,6 +55,7 @@ class BaseStatistiques:
 
     @contextmanager
     def _connexion(self) -> Iterator[sqlite3.Connection]:
+        """Exécute le traitement « connexion »."""
         # Une connexion courte par opération : sûre avec les threads du serveur.
         with closing(sqlite3.connect(self.chemin, timeout=5)) as db:
             db.execute("PRAGMA foreign_keys = ON")
