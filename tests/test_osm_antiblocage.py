@@ -14,12 +14,15 @@ CARTES = Path(__file__).resolve().parents[1] / "data" / "maps"
 
 
 class SimulationAntibouchonTests(unittest.TestCase):
+    """Représente SimulationAntibouchonTests dans l'application."""
     def simulation(self):
+        """Exécute le traitement « simulation »."""
         fichier = CARTES / "demo_grille_multicarrefours.osm"
         centre = ReseauRoutier(str(fichier)).carrefours()[0]["id"]
         return SimulationReseauOSM(str(fichier), centre, 1440, 900, graine=8)
 
     def test_itineraires_urgence_fixes_trafic_aleatoire(self):
+        """Exécute le traitement « test itineraires urgence fixes trafic aleatoire »."""
 
         premier = self.simulation()
         second = self.simulation()
@@ -53,6 +56,7 @@ class SimulationAntibouchonTests(unittest.TestCase):
         self.assertGreater(trouves, 0, "Aucun trajet d'urgence sur la grille")
 
     def test_plusieurs_urgences_meme_trajet(self):
+        """Exécute le traitement « test plusieurs urgences meme trajet »."""
         sim = self.simulation()
         for direction in ("droite", "gauche", "haut", "bas"):
             trajet = sim._SimulationReseauOSM__choisir_itineraire(
@@ -71,18 +75,21 @@ class SimulationAntibouchonTests(unittest.TestCase):
         self.fail("Aucune direction d'urgence n'est accessible sur cette carte")
 
     def test_trafic_ordinaire_garde_du_hasard(self):
+        """Exécute le traitement « test trafic ordinaire garde du hasard »."""
         sim = self.simulation()
         a = [ tuple(sim._SimulationReseauOSM__choisir_itineraire() or []) for _ in range(12) ]
         routes = {chemin for chemin in a if chemin}
         self.assertGreater(len(routes), 1)
 
     def test_densite_plafonnee(self):
+        """Exécute le traitement « test densite plafonnee »."""
         sim = self.simulation()
         for _ in range(600):
             sim.avancer()
             self.assertLessEqual(len(sim.get_vehicules()), 125)
 
     def test_repartition_par_zones(self):
+        """Exécute le traitement « test repartition par zones »."""
         sim = self.simulation()
 
         groupes = {0: ["nord"], 4: ["centre"], 8: ["sud"]}
@@ -96,6 +103,7 @@ class SimulationAntibouchonTests(unittest.TestCase):
         )
 
     def test_file_plus_serree_sans_superposition(self):
+        """Exécute le traitement « test file plus serree sans superposition »."""
         sim = self.simulation()
         arriere = VoitureReseau(["1", "2"], [(0, 0), (400, 0)], 2.5, "green")
         avant = VoitureReseau(["1", "2"], [(0, 0), (400, 0)], 2.5, "yellow")
@@ -109,6 +117,7 @@ class SimulationAntibouchonTests(unittest.TestCase):
         self.assertTrue(sim._SimulationReseauOSM__route_libre(arriere, 102.5))
 
     def test_recuperation_un_seul_vehicule(self):
+        """Exécute le traitement « test recuperation un seul vehicule »."""
         sim = self.simulation()
         voiture = sim.get_vehicules()[0]
         sim._SimulationReseauOSM__agents = [voiture]
@@ -123,6 +132,7 @@ class SimulationAntibouchonTests(unittest.TestCase):
         self.assertNotIn(voiture, sim._SimulationReseauOSM__immobilisation)
 
     def test_carte_compacte(self):
+        """Exécute le traitement « test carte compacte »."""
         for nom in ("virage_test.osm", "exemple_test.osm"):
             with self.subTest(carte=nom):
                 fichier = CARTES / nom
