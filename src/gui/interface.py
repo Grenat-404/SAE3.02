@@ -14,6 +14,7 @@ from src.gui.fenetre_urgence import FenetreUrgence
 class Interface(QWidget):
     """Représente Interface dans l'application."""
     def __init__(self, simulation: SimulationDistante) -> None:
+        """Initialise l'objet et ses attributs."""
         super().__init__()
 
         self.simulation = simulation
@@ -36,11 +37,13 @@ class Interface(QWidget):
         self.update()
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
+        """Exécute le traitement « keyPressEvent »."""
         if event.key() == Qt.Key.Key_Escape:
             self.close()
 
     # Partie principale : affichage
     def __dessiner_vehicule(self, painter: QPainter, vehicule: Any) -> None:
+        """Exécute le traitement « dessiner vehicule »."""
         x = int(vehicule.get_x())
         y = int(vehicule.get_y())
         largeur = int(vehicule.get_largeur())
@@ -110,6 +113,7 @@ class Interface(QWidget):
         painter.setPen(Qt.PenStyle.NoPen)
 
     def __dessiner_char(self, painter: QPainter, vehicule: Any) -> None:
+        """Exécute le traitement « dessiner char »."""
         largeur = int(vehicule.get_largeur())
         hauteur = int(vehicule.get_hauteur())
         x = int(vehicule.get_x())
@@ -154,6 +158,7 @@ class Interface(QWidget):
         painter.setPen(Qt.PenStyle.NoPen)
 
     def __dessiner_passages_pietons(self, painter: QPainter, intersection: ObjetDistant) -> None:
+        """Exécute le traitement « dessiner passages pietons »."""
         x = int(intersection.get_x())
         y = int(intersection.get_y())
         largeur = int(intersection.get_largeur())
@@ -189,6 +194,7 @@ class Interface(QWidget):
                 painter.drawRect(x + decalage, py, largeur_bande, longueur)
 
     def __dessiner_pietons(self, painter: QPainter) -> None:
+        """Exécute le traitement « dessiner pietons »."""
         for pieton in self.simulation.get_pietons():
             x = int(pieton["x"])
             y = int(pieton["y"])
@@ -204,6 +210,7 @@ class Interface(QWidget):
 
     # Partie principale : gestion de l'interface
     def paintEvent(self, event: QPaintEvent) -> None:
+        """Affiche le traitement « paintEvent »."""
         painter = QPainter(self)
         painter.fillRect(self.rect(), QColor(70, 120, 60))
         painter.setPen(Qt.PenStyle.NoPen)
@@ -342,6 +349,7 @@ class Interface(QWidget):
         self.__dessiner_pietons(painter)
 
     def resizeEvent(self, event: QResizeEvent) -> None:
+        """Affiche le traitement « resizeEvent »."""
         largeur_panneau = self.__panneau_urgence.width()
         self.__panneau_urgence.setGeometry(self.width() - largeur_panneau, 0, largeur_panneau, self.height())
         super().resizeEvent(event)
