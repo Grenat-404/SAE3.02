@@ -59,6 +59,29 @@ class ReactionUrgenceOSMTests(unittest.TestCase):
         # L'itinéraire fixe de l'urgence ne change pas.
         self.assertEqual(urgence.get_chemin(), chemin_initial)
 
+    def test_detour_avant_rejoindre_la_route_urgence(self):
+        sim, _, _ = self.preparer()
+        positions = sim._SimulationReseauOSM__positions
+        urgence_nodes = ["13", "14", "15", "16", "17"]
+        normale_nodes = ["2", "13", "14", "15", "16", "17"]
+        urgence = VoitureReseau(
+            urgence_nodes, [positions[n] for n in urgence_nodes],
+            3.4, "white", "ambulance", 3, 9
+        )
+        normale = VoitureReseau(
+            normale_nodes, [positions[n] for n in normale_nodes],
+            2.5, "green"
+        )
+        normale.set_avancement(40)
+        sim._SimulationReseauOSM__agents = [normale, urgence]
+        position_avant = normale.position()
+        sim._SimulationReseauOSM__reagir_aux_urgences()
+        # Une voiture sur une autre rue ne se déporte pas sur l'accotement.
+        self.assertEqual(normale.get_decalage(), 0)
+        self.assertEqual(normale.position(), position_avant)
+        self.assertEqual(normale.get_chemin()[0], "2")
+        self.assertEqual(normale.get_chemin()[-1], "17")
+
     def test_autre_route_aucun_ecartement(self):
         sim, normale, urgence = self.preparer()
         sim._SimulationReseauOSM__agents = [normale]

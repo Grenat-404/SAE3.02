@@ -527,9 +527,10 @@ class SimulationReseauOSM:
             noeud = chemin[j]
             if noeud not in self.__intersections or distance < 20:
                 continue
-            # La voiture tourne déjà hors de l'itinéraire de l'urgence.
+            # Si la voiture quitte déjà l'axe d'urgence ici, on examine
+            # le carrefour suivant avant de conclure qu'un détour est inutile.
             if (noeud, chemin[j + 1]) not in morceaux_urgence:
-                return False
+                continue
             if not voiture.marquer_detour(urgence.get_urgence_id(), noeud):
                 return False
 
@@ -596,15 +597,36 @@ class SimulationReseauOSM:
                 indice = voiture.get_indice_segment()
                 chemin = voiture.get_chemin()
                 morceau = (chemin[indice - 1], chemin[indice])
-                if morceau not in approches:
+
+                # Si la voiture roule déjà sur la route de l'urgence,
+                # elle peut se ranger immédiatement, jusqu'à 240 px devant.
+                if morceau in approches:
+                    position_locale = (
+                        voiture.get_avancement()
+                        - voiture.distance_noeud(indice - 1)
+                    )
+                    distance = (
+                        approches[morceau] + position_locale
+                        - urgence.get_avancement()
+                    )
+                    if 0 <= distance <= 240:
+                        self.__cedent_urgence.add(voiture)
+                        self.__detour_pour_urgence(voiture, urgence, morceaux)
                     continue
-                position_locale = voiture.get_avancement() - voiture.distance_noeud(indice - 1)
-                distance = (
-                    approches[morceau] + position_locale - urgence.get_avancement()
-                )
-                if 0 <= distance <= 240:
-                    self.__cedent_urgence.add(voiture)
-                    self.__detour_pour_urgence(voiture, urgence, morceaux)
+
+                # Sinon, si elle va rejoindre cette même route dans les
+                # 150 prochains pixels, tenter un virage AVANT d'y arriver.
+                for j in range(indice + 1, len(chemin)):
+                    reste = voiture.distance_noeud(j - 1) - voiture.get_avancement()
+                    if reste > 150:
+                        break
+                    futur = (chemin[j - 1], chemin[j])
+                    if futur not in approches:
+                        continue
+                    avant_urgence = approches[futur] - urgence.get_avancement()
+                    if -5 <= avant_urgence <= 240:
+                        self.__detour_pour_urgence(voiture, urgence, morceaux)
+                    break
 
         for voiture in normales:
             doit_ceder = voiture in self.__cedent_urgence
