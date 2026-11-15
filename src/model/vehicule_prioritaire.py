@@ -1,10 +1,8 @@
-# ---------------------------------------------------------------------------
-# SAÉ 3.02 | src/model/vehicule_prioritaire.py
-# Véhicules d'urgence héritant des véhicules classiques.
-# Définit service, couleur, priorité et dimensions du char.
-# ---------------------------------------------------------------------------
+"""
+Véhicules d'urgence héritant des véhicules classiques.
+Définit service, couleur, priorité et dimensions du char.
+"""
 from src.model.vehicule import Vehicule
-
 
 class VehiculePrioritaire(Vehicule):
     def __init__(self, x, y, vitesse, direction, destination, type_service, niveau_priorite, type_urgence, urgence_id):

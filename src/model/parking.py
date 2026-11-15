@@ -1,12 +1,10 @@
-# ---------------------------------------------------------------------------
-# SAÉ 3.02 | src/model/parking.py
-# Gestion des places et des manœuvres du parking prédéfini.
-# État et déplacements utilisés uniquement dans le mode classique.
-# ---------------------------------------------------------------------------
+"""
+Gestion des places et des manœuvres du parking prédéfini.
+État et déplacements utilisés uniquement dans le mode classique.
+"""
 import random
 from src.model.route import Route
 from src.model.place import Place
-
 
 class Parking:
     def __init__(self, x, y, largeur, hauteur, trottoir=20):

@@ -1,8 +1,7 @@
-# ---------------------------------------------------------------------------
-# SAÉ 3.02 | src/reseau/protocole.py
-# Constantes et validation du protocole TCP/UDP du projet.
-# Sérialise les messages JSON et vérifie les urgences.
-# ---------------------------------------------------------------------------
+"""
+Constantes et validation du protocole TCP/UDP du projet.
+Sérialise les messages JSON et vérifie les urgences.
+"""
 import json
 
 PORT_TCP = 5050
@@ -14,7 +13,6 @@ TAILLE_MAXIMALE = 1_000_000
 
 def encoder(message):
     return (json.dumps(message, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
-
 
 def decoder(ligne):
     if len(ligne) > TAILLE_MAXIMALE:
@@ -40,8 +38,7 @@ def verifier_urgence(message):
         "droite": {None, "haut", "bas"},
         "gauche": {None, "bas", "haut"},
         "bas": {None, "droite", "gauche"},
-        "haut": {None, "gauche", "droite"},
-    }
+        "haut": {None, "gauche", "droite"},}
     nouveaux = []
     for vehicule in vehicules:
         if not isinstance(vehicule, dict):
@@ -57,6 +54,5 @@ def verifier_urgence(message):
             "service": service,
             "direction": direction,
             "destination": destination,
-            "provenance": str(vehicule.get("provenance", ""))[:40],
-        })
+            "provenance": str(vehicule.get("provenance", ""))[:40],})
     return urgence.strip(), priorite, nouveaux

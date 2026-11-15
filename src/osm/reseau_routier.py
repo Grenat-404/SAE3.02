@@ -1,8 +1,7 @@
-# ---------------------------------------------------------------------------
-# SAÉ 3.02 | src/osm/reseau_routier.py
-# Lecture hors-ligne du graphe routier OpenStreetMap.
-# Gère les sens uniques, sélection des carrefours et recherche Dijkstra.
-# ---------------------------------------------------------------------------
+"""
+Lecture hors-ligne du graphe routier OpenStreetMap.
+Gère les sens uniques, sélection des carrefours et recherche Dijkstra.
+"""
 import heapq
 import math
 import random

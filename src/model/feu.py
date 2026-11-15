@@ -1,8 +1,8 @@
-# ---------------------------------------------------------------------------
-# SAÉ 3.02 | src/model/feu.py
-# Modèle d'un feu de circulation du carrefour prédéfini.
-# Stocke son état et sa position.
-# ---------------------------------------------------------------------------
+"""
+Modèle d'un feu de circulation du carrefour prédéfini.
+Stocke son état et sa position.
+"""
+
 class Feu:
     def __init__(self, x, y, etat="rouge", orientation="vertical", inverse = False):
         self.__x = x

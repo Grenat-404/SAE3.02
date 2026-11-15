@@ -1,13 +1,11 @@
-# ---------------------------------------------------------------------------
-# SAÉ 3.02 | src/reseau/proxy.py
-# Interface distante exposant l'état reçu comme des objets Qt.
-# Permet à la fenêtre classique de fonctionner sans simulation locale.
-# ---------------------------------------------------------------------------
+"""
+Interface distante exposant l'état reçu comme des objets Qt.
+Permet à la fenêtre classique de fonctionner sans simulation locale.
+"""
 import threading
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from src.reseau.client import ClientReseau
-
 
 class ObjetDistant:
     """Expose les getters existants des modèles graphiques sans moteur local."""

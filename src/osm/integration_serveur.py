@@ -1,8 +1,7 @@
-# ---------------------------------------------------------------------------
-# SAÉ 3.02 | src/osm/integration_serveur.py
-# Adaptateur serveur pour alterner simulation classique et cartes OSM.
-# Conserve les sockets existants, pilote le moteur OSM côté serveur.
-# ---------------------------------------------------------------------------
+"""
+Adaptateur serveur pour alterner simulation classique et cartes OSM.
+Conserve les sockets existants, pilote le moteur OSM côté serveur.
+"""
 import base64
 import json
 import re
@@ -14,7 +13,6 @@ from src.reseau import serveur as serveur_original
 from src.reseau.protocole import encoder
 from src.simulation.simulation import Simulation
 from src.osm.simulation_reseau_osm import SimulationReseauOSM
-
 
 class SimulationAvecOSM:
     """Aiguillage entre le carrefour d'origine et le moteur multicarrefours."""

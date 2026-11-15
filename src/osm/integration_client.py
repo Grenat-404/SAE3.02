@@ -1,8 +1,7 @@
-# ---------------------------------------------------------------------------
-# SAÉ 3.02 | src/osm/integration_client.py
-# Adaptateur qui affiche les états OSM reçus par TCP.
-# Conserve la fenêtre d'urgence et le carrefour prédéfini.
-# ---------------------------------------------------------------------------
+"""
+Adaptateur qui affiche les états OSM reçus par TCP.
+Conserve la fenêtre d'urgence et le carrefour prédéfini.
+"""
 import base64
 import json
 import socket
@@ -16,7 +15,6 @@ from src.gui.interface import Interface
 from src.gui.selecteur_osm import SelecteurOSM
 from src.gui.vue_reseau_osm import dessiner_reseau_osm
 from src.reseau.proxy import SimulationDistante
-
 
 class VehiculeDistantOSM:
     """Même interface de dessin que VoitureReseau, avec des données JSON."""

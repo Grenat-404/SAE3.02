@@ -1,13 +1,11 @@
-# ---------------------------------------------------------------------------
-# SAÉ 3.02 | src/gui/interface.py
-# Dessin Qt du carrefour prédéfini, du parking et des piétons.
-# Ne calcule pas le trafic : les états proviennent du serveur.
-# ---------------------------------------------------------------------------
+"""
+Dessin Qt du carrefour prédéfini, du parking et des piétons.
+Ne calcule pas le trafic : les états proviennent du serveur.
+"""
 from PyQt6.QtWidgets import QWidget
 from PyQt6.QtGui import QPainter, QPen, QColor, QFont
 from PyQt6.QtCore import QTimer, Qt
 from src.gui.fenetre_urgence import FenetreUrgence
-
 
 class Interface(QWidget):
     def __init__(self, simulation):
@@ -167,7 +165,6 @@ class Interface(QWidget):
         y_sud = y + hauteur + distance
 
         painter.setPen(Qt.PenStyle.NoPen)
-
         painter.setBrush(Qt.GlobalColor.darkGray)
 
         for px in (x_ouest, x_est):
@@ -181,7 +178,6 @@ class Interface(QWidget):
         for decalage in range(marge, hauteur - marge - largeur_bande + 1, espacement):
             for px in (x_ouest, x_est):
                 painter.drawRect(px, y + decalage, longueur, largeur_bande)
-
         for decalage in range(marge, largeur - marge - largeur_bande + 1, espacement):
             for py in (y_nord, y_sud):
                 painter.drawRect(x + decalage, py, largeur_bande, longueur)
@@ -190,7 +186,6 @@ class Interface(QWidget):
         for pieton in self.simulation.get_pietons():
             x = int(pieton["x"])
             y = int(pieton["y"])
-
             painter.setPen(QPen(QColor(20, 20, 20), 1))
 
             painter.setBrush(QColor(255, 180, 50))
@@ -204,16 +199,11 @@ class Interface(QWidget):
     # Partie principale : gestion de l'interface
     def paintEvent(self, event):
         painter = QPainter(self)
-
         painter.fillRect(self.rect(), QColor(70, 120, 60))
-
         painter.setPen(Qt.PenStyle.NoPen)
-
         painter.setBrush(Qt.GlobalColor.darkGray)
-
         for route in self.simulation.get_routes():
             painter.drawRect(int(route.get_x()), int(route.get_y()), int(route.get_largeur()), int(route.get_hauteur()),)
-
         pen = QPen(Qt.GlobalColor.white, 3)
         painter.setPen(pen)
 
@@ -230,38 +220,29 @@ class Interface(QWidget):
             int(x_arret_droite),
             int(centre_y),
             int(x_arret_droite),
-            int(intersection.get_y() + intersection.get_hauteur())
-        )
+            int(intersection.get_y() + intersection.get_hauteur()))
 
         x_arret_gauche = (intersection.get_x() + intersection.get_largeur() + distance_arret)
         painter.drawLine(int(x_arret_gauche), int(intersection.get_y()), int(x_arret_gauche), int(centre_y))
-
         y_arret_bas = intersection.get_y() - distance_arret
         painter.drawLine(int(intersection.get_x()), int(y_arret_bas), int(centre_x), int(y_arret_bas))
-
         y_arret_haut = (intersection.get_y() + intersection.get_hauteur() + distance_arret)
         painter.drawLine(
             int(centre_x),
             int(y_arret_haut),
             int(intersection.get_x() + intersection.get_largeur()),
-            int(y_arret_haut)
-        )
+            int(y_arret_haut))
 
         pen_pointille = QPen(Qt.GlobalColor.white, 2, Qt.PenStyle.DashLine)
         painter.setPen(pen_pointille)
-
         painter.drawLine(0, centre_y, intersection.get_x(), centre_y)
         painter.drawLine(intersection.get_x() + intersection.get_largeur(), centre_y, largeur_ecran, centre_y)
-
         painter.drawLine(centre_x, 0, centre_x, intersection.get_y())
         painter.drawLine(centre_x, intersection.get_y() + intersection.get_hauteur(), centre_x, hauteur_ecran)
 
         painter.setPen(Qt.PenStyle.NoPen)
-
         painter.setPen(Qt.PenStyle.NoPen)
-
         self.__dessiner_passages_pietons(painter, intersection)
-
         for feu in self.simulation.get_feux():
 
             if feu.get_orientation() == "horizontale":
@@ -300,10 +281,8 @@ class Interface(QWidget):
 
             painter.setBrush(Qt.GlobalColor.red if feu.get_etat() == "rouge" else Qt.GlobalColor.darkRed)
             painter.drawEllipse(pos_rouge[0], pos_rouge[1], 11, 11)
-
             painter.setBrush(Qt.GlobalColor.yellow if feu.get_etat() == "orange" else Qt.GlobalColor.darkYellow)
             painter.drawEllipse(pos_orange[0], pos_orange[1], 11, 11)
-
             painter.setBrush(Qt.GlobalColor.green if feu.get_etat() == "vert" else Qt.GlobalColor.darkGreen)
             painter.drawEllipse(pos_vert[0], pos_vert[1], 11, 11)
 
@@ -344,21 +323,16 @@ class Interface(QWidget):
         painter.drawText(
             int(parking.get_x()),
             max(15, int(parking.get_y()) - 8),
-            f"Places libres : {parking.get_nb_libres()} / {parking.get_nb_places()}"
-        )
-
+            f"Places libres : {parking.get_nb_libres()} / {parking.get_nb_places()}")
         painter.setBrush(Qt.GlobalColor.darkGray)
-
         painter.setPen(Qt.PenStyle.NoPen)
 
         for vehicule in self.simulation.get_vehicules():
             est_char = hasattr(vehicule, "get_type_service") and vehicule.get_type_service() == "char"
-
             if est_char:
                 self.__dessiner_char(painter, vehicule)
             else:
                 self.__dessiner_vehicule(painter, vehicule)
-
         self.__dessiner_pietons(painter)
 
     def resizeEvent(self, event):

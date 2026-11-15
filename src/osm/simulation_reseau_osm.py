@@ -1,13 +1,11 @@
-# ---------------------------------------------------------------------------
-# SAÉ 3.02 | src/osm/simulation_reseau_osm.py
-# Moteur multicarrefours OSM exécuté exclusivement sur le serveur.
-# Véhicules, trajets aléatoires, urgences fixes, feux, priorité et dégagement.
-# ---------------------------------------------------------------------------
+"""
+Moteur multicarrefours OSM exécuté exclusivement sur le serveur.
+Véhicules, trajets aléatoires, urgences fixes, feux, priorité et dégagement.
+"""
 import math
 import random
 
 from src.osm.reseau_routier import ReseauRoutier
-
 
 class VoitureReseau:
     """Véhicule qui suit un chemin de nœuds OSM ; attributs privés."""

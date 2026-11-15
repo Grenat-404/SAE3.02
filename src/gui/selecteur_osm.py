@@ -1,13 +1,11 @@
-# ---------------------------------------------------------------------------
-# SAÉ 3.02 | src/gui/selecteur_osm.py
-# Sélection des fichiers de cartes OSM et de leurs carrefours.
-# Le sélecteur envoie le centre choisi au client connecté.
-# ---------------------------------------------------------------------------
+"""
+Sélection des fichiers de cartes OSM et de leurs carrefours.
+Le sélecteur envoie le centre choisi au client connecté.
+"""
 from pathlib import Path
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (QComboBox, QFrame, QHBoxLayout, QLabel, QPushButton, QMessageBox)
 from src.osm.reseau_routier import ReseauRoutier
-
 
 class SelecteurOSM(QFrame):
     carrefour_charge = pyqtSignal(object)

@@ -1,8 +1,7 @@
-# ---------------------------------------------------------------------------
-# SAÉ 3.02 | src/gui/vue_reseau_osm.py
-# Dessin des routes, des feux et des véhicules du mode OSM.
-# Le moteur de circulation reste côté serveur.
-# ---------------------------------------------------------------------------
+"""
+Dessin des routes, des feux et des véhicules du mode OSM.
+Le moteur de circulation reste côté serveur.
+"""
 import math
 from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QColor, QFont, QPen
@@ -12,8 +11,7 @@ COULEURS = {
     'magenta': '#eb00f5', 'darkCyan': '#008d96',
     'darkMagenta': '#910094', 'darkYellow': '#9c9300',
     'white': '#eeeeee', 'red': '#e53333', 'blue': '#3579fc',
-    'darkGreen': '#4a603c'
-}
+    'darkGreen': '#4a603c'}
 
 # Partie principale : affichage
 def dessiner_reseau_osm(painter, simulation, clignotant_tick):

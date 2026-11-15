@@ -1,28 +1,21 @@
-# ---------------------------------------------------------------------------
-# SAÉ 3.02 | src/gui/fenetre_urgence.py
-# Panneau Qt pour préparer, envoyer et suivre les véhicules d'urgence.
-# Formulaire partagé par la simulation prédéfinie et les cartes OSM.
-# ---------------------------------------------------------------------------
+"""
+Panneau Qt pour préparer, envoyer et suivre les véhicules d'urgence.
+Formulaire partagé par la simulation prédéfinie et les cartes OSM.
+"""
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QWidget,QVBoxLayout,QHBoxLayout,QLabel,QComboBox,QSpinBox,QPushButton,QListWidget,QFrame
-
 
 class FenetreUrgence(QWidget):
 
     def __init__(self, simulation, parent=None):
         super().__init__(parent)
-
         self.__simulation = simulation
         self.__vehicules_en_attente = []
-
         self.__panneau_reduit = False
         self.__largeur_ouverte = 250
         self.__largeur_reduite = 55
-
         self.setFixedWidth(self.__largeur_ouverte)
-
         self.setObjectName("panneauUrgence")
-
         self.setStyleSheet("""
             #panneauUrgence {
                 background-color: #252525;
@@ -90,227 +83,123 @@ class FenetreUrgence(QWidget):
         """)
 
         self.__creer_interface()
-
         if hasattr(self.__simulation, 'reponse_urgence'):
             self.__simulation.reponse_urgence.connect(self.__label_message.setText)
 
     # Partie principale : gestion de l'interface
     def __creer_interface(self):
         layout_principal = QVBoxLayout(self)
-
         layout_principal.setAlignment(Qt.AlignmentFlag.AlignTop)
-
         layout_principal.setContentsMargins(8, 8, 8, 8)
-
         layout_principal.setSpacing(8)
-
         self.__bouton_reduire = QPushButton("▶")
-
         self.__bouton_reduire.setObjectName("boutonReduire")
-
         self.__bouton_reduire.setFixedSize(35, 35)
-
         self.__bouton_reduire.setToolTip("Réduire le panneau")
-
         self.__bouton_reduire.clicked.connect(self.__basculer_panneau)
-
         layout_bouton = QHBoxLayout()
-
         layout_bouton.setContentsMargins(0, 0, 0, 0)
-
         layout_bouton.setSpacing(0)
-
         layout_bouton.addStretch()
-
-        layout_bouton.addWidget(
-            self.__bouton_reduire,
-            alignment=(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight)
-        )
-
+        layout_bouton.addWidget(self.__bouton_reduire, alignment=(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight))
         layout_principal.addLayout(layout_bouton)
-
         self.__contenu = QWidget()
-
         layout = QVBoxLayout(self.__contenu)
-
         layout.setContentsMargins(0, 0, 0, 0)
-
         layout.setSpacing(10)
-
         layout_principal.addWidget(self.__contenu)
-
         bloc_urgence = QFrame()
         bloc_urgence.setObjectName("bloc")
-
         layout_urgence = QVBoxLayout(bloc_urgence)
-
         layout_urgence.setContentsMargins(10, 10, 10, 10)
-
         layout_urgence.setSpacing(6)
-
         titre_urgence = QLabel("Urgence")
-
         titre_urgence.setObjectName("titreBloc")
-
         layout_urgence.addWidget(titre_urgence)
-
         layout_urgence.addWidget(QLabel("Type d'urgence :"))
-
         self.__combo_type_urgence = QComboBox()
-
         self.__combo_type_urgence.setEditable(True)
-
-        self.__combo_type_urgence.addItems([
-            "Accident",
-            "Accident grave",
-            "Incendie",
-            "Secours à personne",
-            "Intervention police"
-        ])
-
+        self.__combo_type_urgence.addItems(["Accident", "Accident grave", "Incendie", "Secours à personne", "Intervention police"])
         layout_urgence.addWidget(self.__combo_type_urgence)
-
         layout_urgence.addWidget(QLabel("Niveau d'urgence :"))
-
         self.__spin_priorite = QSpinBox()
-
         self.__spin_priorite.setRange(1, 5)
-
         self.__spin_priorite.setValue(3)
-
         layout_urgence.addWidget(self.__spin_priorite)
-
         layout.addWidget(bloc_urgence)
-
         bloc_vehicule = QFrame()
         bloc_vehicule.setObjectName("bloc")
-
         layout_vehicule = QVBoxLayout(bloc_vehicule)
-
         layout_vehicule.setContentsMargins(10, 10, 10, 10)
-
         layout_vehicule.setSpacing(6)
-
         titre_vehicule = QLabel("Ajouter un véhicule")
-
         titre_vehicule.setObjectName("titreBloc")
-
         layout_vehicule.addWidget(titre_vehicule)
-
         layout_vehicule.addWidget(QLabel("Type de véhicule :"))
-
         self.__combo_service = QComboBox()
-
         self.__combo_service.addItem("Ambulance", "ambulance")
-
         self.__combo_service.addItem("Pompier", "pompier")
-
         self.__combo_service.addItem("Police", "police")
-
         self.__combo_service.addItem("Char d'assaut", "char")
-
         layout_vehicule.addWidget(self.__combo_service)
-
         layout_vehicule.addWidget(QLabel("Le véhicule vient de :"))
-
         self.__combo_provenance = QComboBox()
-
         self.__combo_provenance.addItem("Nord", "bas")
-
         self.__combo_provenance.addItem("Sud", "haut")
-
         self.__combo_provenance.addItem("Est", "gauche")
-
         self.__combo_provenance.addItem("Ouest", "droite")
-
         layout_vehicule.addWidget(self.__combo_provenance)
-
         layout_vehicule.addWidget(QLabel("Direction voulue :"))
-
         self.__combo_destination = QComboBox()
         self.__combo_destination.addItem("Tout droit", "tout_droit")
         self.__combo_destination.addItem("Tourner à gauche", "gauche")
         self.__combo_destination.addItem("Tourner à droite", "droite")
         layout_vehicule.addWidget(self.__combo_destination)
-
         bouton_ajouter = QPushButton("Ajouter le véhicule")
-
         bouton_ajouter.clicked.connect(self.__ajouter_vehicule)
-
         layout_vehicule.addWidget(bouton_ajouter)
-
         layout.addWidget(bloc_vehicule)
-
         bloc_liste = QFrame()
         bloc_liste.setObjectName("bloc")
-
         layout_liste = QVBoxLayout(bloc_liste)
-
         layout_liste.setContentsMargins(10, 10, 10, 10)
-
         layout_liste.setSpacing(6)
-
         titre_liste = QLabel("Véhicules de l'urgence")
-
         titre_liste.setObjectName("titreBloc")
-
         layout_liste.addWidget(titre_liste)
-
         self.__liste_vehicules = QListWidget()
-
         self.__liste_vehicules.setMinimumHeight(180)
-
         layout_liste.addWidget(self.__liste_vehicules)
-
         bouton_retirer = QPushButton("Retirer le véhicule sélectionné")
-
         bouton_retirer.clicked.connect(self.__retirer_vehicule)
-
         layout_liste.addWidget(bouton_retirer)
-
         bouton_declencher = QPushButton("Déclencher l'urgence")
-
         bouton_declencher.clicked.connect(self.__declencher_urgence)
-
         layout_liste.addWidget(bouton_declencher)
-
         layout.addWidget(bloc_liste)
-
         bouton_reset = QPushButton("↻ Réinitialiser la simulation")
         bouton_reset.clicked.connect(self.__reinitialiser_simulation)
         layout.addWidget(bouton_reset)
-
         self.__label_message = QLabel("")
-
         self.__label_message.setWordWrap(True)
-
         layout.addWidget(self.__label_message)
 
     def __basculer_panneau(self):
         if self.__panneau_reduit:
             self.__contenu.show()
-
             self.setFixedWidth(self.__largeur_ouverte)
-
             self.__bouton_reduire.setText("▶")
-
             self.__bouton_reduire.setToolTip("Réduire le panneau")
-
             self.__panneau_reduit = False
 
         else:
             self.__contenu.hide()
-
             self.setFixedWidth(self.__largeur_reduite)
-
             self.__bouton_reduire.setText("◀")
-
             self.__bouton_reduire.setToolTip("Ouvrir le panneau")
-
             self.__panneau_reduit = True
 
         parent = self.parent()
-
         if parent is not None:
             self.setGeometry(parent.width() - self.width(), 0, self.width(), parent.height())
 
@@ -332,7 +221,6 @@ class FenetreUrgence(QWidget):
         }
 
         destination = destinations[direction][choix_destination]
-
         configuration = {"service": service, "direction": direction, "destination": destination,
                          "provenance": provenance}
 
@@ -346,28 +234,22 @@ class FenetreUrgence(QWidget):
 
         if ligne < 0:
             self.__label_message.setText("Sélectionne un véhicule à retirer.")
-
             return
 
         self.__liste_vehicules.takeItem(ligne)
-
         del self.__vehicules_en_attente[ ligne ]
-
         self.__label_message.setText("Véhicule retiré.")
 
     # Partie principale : envoi au serveur
     def __declencher_urgence(self):
         if len(self.__vehicules_en_attente) == 0:
-
             self.__label_message.setText("Ajoute au moins un véhicule.")
-
             return
 
         type_urgence = (self.__combo_type_urgence .currentText() .strip())
 
         if type_urgence == "":
             self.__label_message.setText("Indique un type d'urgence.")
-
             return
 
         niveau_priorite = (self.__spin_priorite.value())
@@ -385,11 +267,9 @@ class FenetreUrgence(QWidget):
         self.__label_message.setText(
             "Demande envoyée au serveur, en attente de confirmation..."
             if urgence_id is None
-            else f"Urgence #{urgence_id} déclenchée."
-        )
+            else f"Urgence #{urgence_id} déclenchée.")
 
         self.__vehicules_en_attente.clear()
-
         self.__liste_vehicules.clear()
 
     def __reinitialiser_simulation(self):

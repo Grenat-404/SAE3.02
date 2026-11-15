@@ -1,8 +1,7 @@
-# ---------------------------------------------------------------------------
-# SAÉ 3.02 | src/reseau/serveur.py
-# Serveur TCP et découverte UDP, pilotant les simulations.
-# Synchronisation des clients et des états sur deux machines.
-# ---------------------------------------------------------------------------
+"""
+Serveur TCP et découverte UDP, pilotant les simulations.
+Synchronisation des clients et des états sur deux machines.
+"""
 from collections import deque
 import select
 import socket
@@ -14,7 +13,6 @@ from src.reseau.protocole import (PORT_TCP, PORT_UDP, SIGNATURE, GROUPE_MULTICAS
 from src.simulation.simulation import Simulation
 
 PERIODE = 0.03
-
 
 class SessionClient(threading.Thread):
     """Chaque connexion a son tampon d'envoi: aucun socket ne bloque le moteur."""
@@ -53,7 +51,6 @@ class SessionClient(threading.Thread):
             try:
                 if type(numero) is not int:
                     raise ValueError("Numéro de requête invalide")
-
                 urgence, priorite, vehicules = verifier_urgence(message)
                 simulation = self.__serveur.simulation()
 
@@ -61,27 +58,21 @@ class SessionClient(threading.Thread):
                     raise ValueError("Simulation non initialisée")
 
                 identifiant = simulation.creer_urgence(urgence, priorite, vehicules)
-
                 reponse = { "type": "reponse_urgence", "requete": numero, "ok": True, "urgence_id": identifiant }
-
                 print(f"[SERVEUR] Urgence #{identifiant}: {len(vehicules)} véhicule(s)", flush=True)
 
             except (ValueError, KeyError, TypeError) as erreur:
                 reponse = { "type": "reponse_urgence", "requete": numero, "ok": False, "erreur": str(erreur) }
-
             with self.__verrou:
                 self.__reponses.append(encoder(reponse))
-
         elif message.get("type") == "reinitialiser":
             self.__serveur.demander_reinitialisation()
 
     def run(self):
         connexion = self.__socket
         connexion.setblocking(False)
-
         tampon_reception = bytearray()
         tampon_envoi = b""
-
         print(f"[TCP] Client connecté : {self.__adresse[0]}", flush=True)
 
         try:
@@ -90,46 +81,35 @@ class SessionClient(threading.Thread):
                     with self.__verrou:
                         if self.__reponses:
                             tampon_envoi = self.__reponses.popleft()
-
                         elif self.__dernier_etat is not None:
                             tampon_envoi = self.__dernier_etat
                             self.__dernier_etat = None
 
                 lecture, ecriture, _ = select.select([connexion], [connexion] if tampon_envoi else [], [], 0.025)
-
                 if lecture:
                     bloc = connexion.recv(65536)
-
                     if not bloc:
                         break
-
                     tampon_reception.extend(bloc)
-
                     if len(tampon_reception) > TAILLE_MAXIMALE:
                         break
 
                     while b"\n" in tampon_reception:
                         ligne, _, suite = tampon_reception.partition(b"\n")
                         tampon_reception = bytearray(suite)
-
                         try:
                             self.__traiter(decoder(ligne))
-
                         except (ValueError, UnicodeDecodeError) as erreur:
                             with self.__verrou:
                                 self.__reponses.append(encoder({ "type": "erreur", "message": str(erreur) }))
 
                 if ecriture:
                     taille = connexion.send(tampon_envoi)
-
                     if taille <= 0:
                         break
-
                     tampon_envoi = tampon_envoi[taille:]
-
         except (OSError, ValueError):
             pass
-
         finally:
             self.arreter()
             self.__serveur.retirer_client(self)
@@ -140,19 +120,14 @@ class ServeurReseau:
     def __init__(self, port_tcp=PORT_TCP, port_udp=PORT_UDP):
         self.__port_tcp = port_tcp
         self.__port_udp = port_udp
-
         self.__actif = threading.Event()
         self.__simulation = None
-
         self.__verrou_simulation = threading.Lock()
         self.__verrou_clients = threading.Lock()
-
         self.__clients = set()
-
         self.__tcp = None
         self.__udp = None
         self.__threads = []
-
         self.__taille_ecran = None
         self.__reinitialisation_demandee = threading.Event()
 
@@ -172,11 +147,8 @@ class ServeurReseau:
 
         with self.__verrou_simulation:
             if self.__simulation is None:
-
                 self.__taille_ecran = (largeur, hauteur)
-
                 self.__simulation = Simulation(largeur, hauteur)
-
                 print(f"[SERVEUR] Simulation originale : {largeur} x {hauteur}", flush=True)
 
     def demander_reinitialisation(self):
@@ -192,44 +164,31 @@ class ServeurReseau:
         while self.actif():
             try:
                 paquet, adresse = udp.recvfrom(512)
-
                 if paquet.decode("ascii", errors="ignore").strip() == SIGNATURE:
-                    udp.sendto(
-                        encoder({ "type": "annonce", "signature": SIGNATURE, "port": self.__port_tcp }),
-                        adresse
-                    )
-
+                    udp.sendto(encoder({ "type": "annonce", "signature": SIGNATURE, "port": self.__port_tcp }), adresse)
             except socket.timeout:
                 continue
-
             except OSError:
                 break
 
     def __accepter(self):
         tcp = self.__tcp
-
         while self.actif():
             try:
                 connexion, adresse = tcp.accept()
-
             except socket.timeout:
                 continue
-
             except OSError:
                 break
-
             client = SessionClient(self, connexion, adresse)
-
             with self.__verrou_clients:
                 self.__clients.add(client)
-
             client.start()
 
     # Partie principale : communication ou simulation
     def demarrer(self):
         tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
         try:
             tcp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
@@ -238,17 +197,13 @@ class ServeurReseau:
             tcp.settimeout(0.5)
 
             udp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
             udp.bind(("0.0.0.0", self.__port_udp))
 
             try:
                 abonnement = (socket.inet_aton(GROUPE_MULTICAST) + socket.inet_aton("0.0.0.0"))
-
                 udp.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, abonnement)
-
             except OSError:
                 pass
-
             udp.settimeout(0.5)
 
         except OSError:
@@ -262,49 +217,35 @@ class ServeurReseau:
 
         for fonction in (self.__accepter, self.__decouverte):
             thread = threading.Thread(target=fonction, daemon=True)
-
             thread.start()
             self.__threads.append(thread)
 
         print(f"[SERVEUR] Découverte UDP {self.__port_udp}, TCP {self.__port_tcp}", flush=True)
-
         print("[SERVEUR] En attente du client pour connaître la taille de l'écran...", flush=True)
 
     # Partie principale : boucle serveur
     def tourner(self):
         prochain = time.monotonic()
-
         while self.actif():
-
             if self.__reinitialisation_demandee.is_set():
                 self.__reinitialisation_demandee.clear()
-
                 with self.__verrou_simulation:
                     if (self.__simulation is not None and self.__taille_ecran is not None):
-
                         self.__simulation.arreter()
-
                         self.__simulation = Simulation(*self.__taille_ecran)
-
                         print("[SERVEUR] Simulation réinitialisée", flush=True)
 
             simulation = self.simulation()
-
             if simulation is not None:
                 simulation.avancer()
-
                 etat = encoder(simulation.exporter_etat_reseau())
-
                 with self.__verrou_clients:
                     clients = tuple(self.__clients)
-
                 for client in clients:
                     client.publier(etat)
 
             prochain += PERIODE
-
             attente = prochain - time.monotonic()
-
             if attente > 0:
                 time.sleep(attente)
             else:
@@ -312,20 +253,14 @@ class ServeurReseau:
 
     def arreter(self):
         self.__actif.clear()
-
         if self.__tcp is not None:
             self.__tcp.close()
-
         if self.__udp is not None:
             self.__udp.close()
-
         with self.__verrou_clients:
             clients = tuple(self.__clients)
-
         for client in clients:
             client.arreter()
-
         simulation = self.simulation()
-
         if simulation is not None:
             simulation.arreter()

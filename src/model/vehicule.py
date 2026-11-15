@@ -1,8 +1,7 @@
-# ---------------------------------------------------------------------------
-# SAÉ 3.02 | src/model/vehicule.py
-# Modèle des véhicules du carrefour prédéfini.
-# Gère mouvement, clignotants, parking et écartement latéral.
-# ---------------------------------------------------------------------------
+"""
+Modèle des véhicules du carrefour prédéfini.
+Gère mouvement, clignotants, parking et écartement latéral.
+"""
 import random
 
 class Vehicule:

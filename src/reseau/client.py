@@ -1,8 +1,7 @@
-# ---------------------------------------------------------------------------
-# SAÉ 3.02 | src/reseau/client.py
-# Client TCP avec découverte automatique du serveur sur le réseau local.
-# Reçoit les états de simulation et envoie les commandes d'urgence.
-# ---------------------------------------------------------------------------
+"""
+Client TCP avec découverte automatique du serveur sur le réseau local.
+Reçoit les états de simulation et envoie les commandes d'urgence.
+"""
 import queue
 import select
 import socket
@@ -11,7 +10,6 @@ import time
 
 from src.reseau.protocole import (PORT_TCP, PORT_UDP, SIGNATURE, GROUPE_MULTICAST,
                                   TAILLE_MAXIMALE, encoder, decoder)
-
 
 class ClientReseau(threading.Thread):
     def __init__(self, largeur, hauteur, recevoir_etat, recevoir_reponse, port_tcp=PORT_TCP, port_udp=PORT_UDP):
@@ -59,11 +57,9 @@ class ClientReseau(threading.Thread):
     def envoyer_reinitialisation(self):
         if not self.connecte():
             raise ConnectionError("Serveur non connecté")
-
         self.__a_envoyer.put({"type": "reinitialiser"})
 
     def __decouvrir(self):
-
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp:
             udp.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             udp.bind(("0.0.0.0", 0))

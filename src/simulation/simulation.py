@@ -1,8 +1,7 @@
-# ---------------------------------------------------------------------------
-# SAÉ 3.02 | src/simulation/simulation.py
-# Moteur historique du carrefour prédéfini.
-# Feux, files, priorité aux urgences, piétons et stationnement.
-# ---------------------------------------------------------------------------
+"""
+Moteur historique du carrefour prédéfini.
+Feux, files, priorité aux urgences, piétons et stationnement.
+"""
 from src.model.route import Route
 from src.model.intersection import Intersection
 from src.model.feu import Feu
@@ -87,8 +86,7 @@ class Simulation:
             "droite": {"x": 20, "y": iy + ih * 3 // 4},
             "gauche": {"x": largeur_ecran - 20, "y": iy + ih // 4},
             "bas": {"x": ix + il // 4, "y": 0},
-            "haut": {"x": ix + il * 3 // 4, "y": hauteur_ecran}
-        }
+            "haut": {"x": ix + il * 3 // 4, "y": hauteur_ecran}}
         self.__y_route_gauche = iy + ih // 4 + 10
         self.__largeur_ecran = largeur_ecran
         self.__hauteur_ecran = hauteur_ecran
@@ -97,9 +95,7 @@ class Simulation:
             "ouest": { "x": ix - 67, "y": iy, "largeur": 55, "hauteur": ih, "axe": "y" },
             "est": { "x": ix + il + 12, "y": iy, "largeur": 55, "hauteur": ih, "axe": "y" },
             "nord": { "x": ix, "y": iy - 67, "largeur": il, "hauteur": 55, "axe": "x" },
-            "sud": { "x": ix, "y": iy + ih + 12, "largeur": il, "hauteur": 55, "axe": "x" }
-        }
-
+            "sud": { "x": ix, "y": iy + ih + 12, "largeur": il, "hauteur": 55, "axe": "x" }}
         self.__pietons = {nom: [] for nom in self.__passages_pietons}
 
         for direction, destination in (("droite", None), ("gauche", "haut"), ("bas", None), ("haut", None)):
@@ -152,67 +148,47 @@ class Simulation:
         for voiture in self.__vehicules:
             if voiture.get_etat() != "route":
                 continue
-
             if (voiture.get_x() < x + largeur + 2
                     and voiture.get_x() + voiture.get_largeur() > x - 2
                     and voiture.get_y() < y + hauteur + 2
                     and voiture.get_y() + voiture.get_hauteur() > y - 2):
                 return False
-
         return True
 
     def __pieton_peut_partir(self, nom, passage):
         """Le piéton traverse au rouge, hors urgence."""
-
         if self.__etat_priorite is not None:
             return False
-
         if nom in ("ouest", "est"):
             feux_rouges = (self.__feu_droite.get_etat() == "rouge" and self.__feu_gauche.get_etat() == "rouge")
         else:
             feux_rouges = (self.__feu_bas.get_etat() == "rouge" and self.__feu_haut.get_etat() == "rouge")
-
         return feux_rouges and self.__passage_libre(passage)
 
     # Partie principale : passages piétons
     def __mettre_a_jour_pietons(self):
-
         maximum_pietons = 1
         frequence = 350
         vitesse = 3
-
         for nom, passage in self.__passages_pietons.items():
-
             groupe = self.__pietons[nom]
             axe = passage["axe"]
-
             if len(groupe) < maximum_pietons:
-
                 if random.randint(1, frequence) == 1:
-
                     sens = random.choice([-1, 1])
-
                     deja_en_attente = any(p["etat"] == "attente" and p["sens"] == sens for p in groupe)
-
                     if not deja_en_attente:
-
                         if axe == "y":
-
                             decalage = -12 if sens == 1 else 12
-
                             x = (passage["x"] + passage["largeur"] / 2 + decalage + random.randint(-4, 4))
-
                             if sens == 1:
                                 y = passage["y"] - 8
                             else:
                                 y = (passage["y"] + passage["hauteur"] + 8)
 
                         else:
-
                             decalage = -12 if sens == 1 else 12
-
                             y = (passage["y"] + passage["hauteur"] / 2 + decalage + random.randint(-4, 4))
-
                             if sens == 1:
                                 x = passage["x"] - 8
                             else:
@@ -221,40 +197,30 @@ class Simulation:
                         groupe.append({ "x": x, "y": y, "sens": sens, "etat": "attente" })
 
             for pieton in groupe[:]:
-
                 if pieton["etat"] == "attente":
-
                     if not self.__pieton_peut_partir(nom, passage):
                         continue
-
                     pieton["etat"] = "traverse"
-
                 pieton[axe] += pieton["sens"] * vitesse
-
                 dimension = (passage["hauteur"] if axe == "y" else passage["largeur"])
 
                 if pieton["sens"] == 1:
                     termine = (pieton[axe] >= passage[axe] + dimension + 8)
                 else:
                     termine = (pieton[axe] <= passage[axe] - 8)
-
                 if termine:
                     groupe.remove(pieton)
 
     def __vehicule_bloque_par_pieton(self, vehicule, vitesse):
-
         if vitesse <= 0:
             return False
-
         direction = vehicule.get_direction()
-
         mouvements = { "droite": (1, 0), "gauche": (-1, 0), "bas": (0, 1), "haut": (0, -1) }
 
         if direction not in mouvements:
             return False
 
         dx, dy = mouvements[direction]
-
         x = vehicule.get_x() + dx * vitesse
         y = vehicule.get_y() + dy * vitesse
 
@@ -262,9 +228,7 @@ class Simulation:
         hauteur = vehicule.get_hauteur()
 
         for nom, groupe in self.__pietons.items():
-
             passage = self.__passages_pietons[nom]
-
             if direction in ("droite", "gauche"):
                 if passage["axe"] != "y":
                     continue
@@ -276,15 +240,11 @@ class Simulation:
             py = passage["y"]
             pl = passage["largeur"]
             ph = passage["hauteur"]
-
             for pieton in groupe:
-
                 if pieton["etat"] != "traverse":
                     continue
-
                 if (x < px + pl + 2 and x + largeur > px - 2 and y < py + ph + 2 and y + hauteur > py - 2):
                     return True
-
         return False
 
     def spawn_vehicles(self):
