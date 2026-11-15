@@ -1,4 +1,5 @@
 """Réaction anticipée aux véhicules d'urgence dans le moteur OSM."""
+import math
 import unittest
 from pathlib import Path
 
@@ -52,10 +53,14 @@ class ReactionUrgenceOSMTests(unittest.TestCase):
         avant = normale.position()
         chemin_initial = list(normale.get_chemin())
         sim._SimulationReseauOSM__reagir_aux_urgences()
+        apres = normale.position()
+        self.assertLessEqual(
+            math.dist(avant[:2], apres[:2]), 1.0,
+            "Une réaction peut glisser de 0,8 pixel, pas téléporter le véhicule"
+        )
         if normale.get_chemin() != chemin_initial:
             self.assertEqual(normale.get_chemin()[:2], chemin_initial[:2])
             self.assertEqual(normale.get_chemin()[-1], chemin_initial[-1])
-            self.assertEqual(normale.position(), avant)
         # L'itinéraire fixe de l'urgence ne change pas.
         self.assertEqual(urgence.get_chemin(), chemin_initial)
 
@@ -81,6 +86,46 @@ class ReactionUrgenceOSMTests(unittest.TestCase):
         self.assertEqual(normale.position(), position_avant)
         self.assertEqual(normale.get_chemin()[0], "2")
         self.assertEqual(normale.get_chemin()[-1], "17")
+
+    def test_garde_son_decalage_au_carrefour(self):
+        sim, normale, urgence = self.preparer()
+        for _ in range(18):
+            sim._SimulationReseauOSM__reagir_aux_urgences()
+        position_decalage = normale.get_decalage()
+        # Atteindre un carrefour sans que l'urgence ait dépassé la voiture.
+        normale.set_avancement(normale.distance_noeud(1) - 8)
+        sim._SimulationReseauOSM__reagir_aux_urgences()
+        self.assertGreaterEqual(normale.get_decalage(), position_decalage)
+        self.assertIn(normale, sim._SimulationReseauOSM__cedent_urgence)
+
+    def test_garde_decalage_apres_changement_de_route(self):
+        sim, normale, urgence = self.preparer()
+        for _ in range(15):
+            sim._SimulationReseauOSM__reagir_aux_urgences()
+        decalage = normale.get_decalage()
+        # La voiture ne se trouve plus sur le même tronçon : le mémoriser
+        # jusqu'à ce que l'ambulance passe l'endroit où elle s'est rangée.
+        sim._SimulationReseauOSM__cedent_memo = {normale: {urgence: 70.0}}
+        normale.set_avancement(normale.distance_noeud(1) + 4)
+        sim._SimulationReseauOSM__reagir_aux_urgences()
+        self.assertGreaterEqual(normale.get_decalage(), decalage)
+
+    def test_retour_attend_place_libre(self):
+        sim, normale, urgence = self.preparer()
+        for _ in range(18):
+            sim._SimulationReseauOSM__reagir_aux_urgences()
+        decalage = normale.get_decalage()
+        # Une voiture se trouve sur la trajectoire du rabattement.
+        obstacle = VoitureReseau(
+            normale.get_chemin(), normale.get_points(), 2.0, "yellow"
+        )
+        obstacle.set_avancement(normale.get_avancement())
+        sim._SimulationReseauOSM__agents = [normale, obstacle]
+        sim._SimulationReseauOSM__reagir_aux_urgences()
+        self.assertEqual(normale.get_decalage(), decalage)
+        sim._SimulationReseauOSM__agents = [normale]
+        sim._SimulationReseauOSM__reagir_aux_urgences()
+        self.assertLess(normale.get_decalage(), decalage)
 
     def test_autre_route_aucun_ecartement(self):
         sim, normale, urgence = self.preparer()

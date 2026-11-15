@@ -144,6 +144,9 @@ class SimulationReseauOSM:
         self.__immobilisation = {}     # véhicule -> ticks sans avancer
         self.__attente_de = {}         # véhicule -> véhicule qui le bloque
         self.__cedent_urgence = set()  # voitures normales en cours d'écartement
+        # véhicule normal -> {urgence : repère parcouru sur la route de l'urgence}
+        # Évite qu'une voiture se rabatte dès qu'elle arrive à un autre tronçon.
+        self.__cedent_memo = {}
         self.__generateur = random.Random(graine)
         # Un trajet stable par provenance / destination, pour le carrefour choisi.
         # Ce cache ne concerne PAS les voitures ordinaires.
@@ -570,78 +573,120 @@ class SimulationReseauOSM:
             return False
         return False
 
-    def __reagir_aux_urgences(self):
-        """Anticiper une urgence derrière soi jusqu'à 240 px sur la même route.
+    def __retour_possible(self, voiture):
+        """Ne pas se rabattre lorsqu'un véhicule est déjà à côté."""
+        x, y, angle = voiture.position()
+        # La prochaine étape du retour représente 0,8 pixel.
+        vers_route = min(0.8, voiture.get_decalage())
+        x += math.sin(angle) * vers_route
+        y -= math.cos(angle) * vers_route
+        ux, uy = math.cos(angle), math.sin(angle)
+        for autre in self.__agents:
+            if autre is voiture:
+                continue
+            ax, ay, _ = autre.position()
+            dx, dy = ax - x, ay - y
+            longitudinal = dx * ux + dy * uy
+            lateral = abs(dx * uy - dy * ux)
+            # Garder au moins une longueur de petite voiture en longitudinal.
+            if abs(longitudinal) < 21 and lateral < 11:
+                return False
+        return True
 
-        Les voitures essaient d'abord de prendre un autre itinéraire.
-        Sinon, elles se rangent progressivement sur l'accotement droit.
+    def __pres_intersection(self, voiture, marge=28):
+        """Le véhicule est-il au niveau d'un carrefour proche ?"""
+        chemin = voiture.get_chemin()
+        indice = voiture.get_indice_segment()
+        for j in (indice - 1, indice):
+            if (0 < j < len(chemin) - 1
+                    and chemin[j] in self.__intersections
+                    and abs(voiture.distance_noeud(j)
+                            - voiture.get_avancement()) < marge):
+                return True
+        return False
+
+    def __reagir_aux_urgences(self):
+        """Laisser libre le trajet d'urgence sans revenir trop tôt sur la route.
+
+        Une fois décalée, la voiture garde son état jusqu'au passage effectif
+        de l'urgence, même lorsqu'un véhicule tourne ou change de segment.
+        Le retour n'est permis que si l'espace latéral est libre.
         """
-        self.__cedent_urgence.clear()
         urgences = [v for v in self.__agents if v.est_prioritaire()]
         normales = [v for v in self.__agents if not v.est_prioritaire()]
+        memo_precedent = self.__cedent_memo
+        nouveau_memo = {}
+        self.__cedent_urgence.clear()
 
         for urgence in urgences:
-            route_urgence = urgence.get_chemin()
-            morceaux = set(zip(route_urgence, route_urgence[1:]))
-            approches = {}
-            for i in range(1, len(route_urgence)):
-                debut = urgence.distance_noeud(i - 1)
-                fin = urgence.distance_noeud(i)
-                if fin < urgence.get_avancement() - 10:
-                    continue
-                if debut > urgence.get_avancement() + 260:
-                    break
-                approches[(route_urgence[i - 1], route_urgence[i])] = debut
+            route = urgence.get_chemin()
+            morceaux_urgence = set(zip(route, route[1:]))
+            approches = {
+                (route[i - 1], route[i]): urgence.distance_noeud(i - 1)
+                for i in range(1, len(route))
+            }
 
             for voiture in normales:
                 indice = voiture.get_indice_segment()
                 chemin = voiture.get_chemin()
                 morceau = (chemin[indice - 1], chemin[indice])
+                repere = None
 
-                # Si la voiture roule déjà sur la route de l'urgence,
-                # elle peut se ranger immédiatement, jusqu'à 240 px devant.
                 if morceau in approches:
-                    position_locale = (
-                        voiture.get_avancement()
-                        - voiture.distance_noeud(indice - 1)
-                    )
-                    distance = (
-                        approches[morceau] + position_locale
-                        - urgence.get_avancement()
-                    )
-                    if 0 <= distance <= 240:
-                        self.__cedent_urgence.add(voiture)
-                        self.__detour_pour_urgence(voiture, urgence, morceaux)
-                    continue
+                    # Même tronçon : on peut comparer leurs progressions
+                    # le long de l'itinéraire fixe de l'urgence.
+                    repere = (approches[morceau]
+                              + voiture.get_avancement()
+                              - voiture.distance_noeud(indice - 1))
+                    distance = repere - urgence.get_avancement()
+                    deja_rangee = urgence in memo_precedent.get(voiture, {})
+                    if 0 <= distance <= 240 or (
+                            deja_rangee and -40 <= distance <= 280):
+                        nouveau_memo.setdefault(voiture, {})[urgence] = repere
+                        if 0 <= distance <= 240:
+                            self.__detour_pour_urgence(
+                                voiture, urgence, morceaux_urgence
+                            )
 
-                # Sinon, si elle va rejoindre cette même route dans les
-                # 150 prochains pixels, tenter un virage AVANT d'y arriver.
-                for j in range(indice + 1, len(chemin)):
-                    reste = voiture.distance_noeud(j - 1) - voiture.get_avancement()
-                    if reste > 150:
+                elif urgence in memo_precedent.get(voiture, {}):
+                    # La voiture a tourné ou changé de rue : garder le
+                    # décalage jusqu'à ce que l'urgence dépasse son ancien repère.
+                    ancien_repere = memo_precedent[voiture][urgence]
+                    if urgence.get_avancement() <= ancien_repere + 40:
+                        nouveau_memo.setdefault(voiture, {})[urgence] = ancien_repere
+
+                # Détecter aussi les voitures qui vont rejoindre le trajet
+                # d'urgence bientôt : elles peuvent prendre une autre rue.
+                if repere is None:
+                    for j in range(indice + 1, len(chemin)):
+                        reste = (
+                            voiture.distance_noeud(j - 1)
+                            - voiture.get_avancement()
+                        )
+                        if reste > 150:
+                            break
+                        futur = (chemin[j - 1], chemin[j])
+                        if futur not in approches:
+                            continue
+                        avant_urgence = approches[futur] - urgence.get_avancement()
+                        if -5 <= avant_urgence <= 240:
+                            self.__detour_pour_urgence(
+                                voiture, urgence, morceaux_urgence
+                            )
                         break
-                    futur = (chemin[j - 1], chemin[j])
-                    if futur not in approches:
-                        continue
-                    avant_urgence = approches[futur] - urgence.get_avancement()
-                    if -5 <= avant_urgence <= 240:
-                        self.__detour_pour_urgence(voiture, urgence, morceaux)
-                    break
+
+        self.__cedent_memo = nouveau_memo
+        self.__cedent_urgence = set(nouveau_memo)
 
         for voiture in normales:
             doit_ceder = voiture in self.__cedent_urgence
-            indice = voiture.get_indice_segment()
-            chemin = voiture.get_chemin()
-            # Ne pas se décaler en plein carrefour ou juste avant un virage.
-            pres_carrefour = False
-            for j in (indice - 1, indice):
-                if (0 < j < len(chemin) - 1
-                        and chemin[j] in self.__intersections
-                        and abs(voiture.distance_noeud(j)
-                                - voiture.get_avancement()) < 28):
-                    pres_carrefour = True
-                    break
-            voiture.ajuster_decalage(10.0 if doit_ceder and not pres_carrefour else 0.0)
+            if doit_ceder:
+                # Ne pas commencer la manoeuvre en plein carrefour, mais
+                # NE JAMAIS rappeler vers la voie un véhicule déjà rangé.
+                if voiture.get_decalage() > 0 or not self.__pres_intersection(voiture):
+                    voiture.ajuster_decalage(10.0)
+            elif voiture.get_decalage() > 0 and self.__retour_possible(voiture):
+                voiture.ajuster_decalage(0.0)
 
     def __priorites(self):
         """Pour chaque carrefour, prioritaire le plus urgent à proximité."""
@@ -835,7 +880,8 @@ class SimulationReseauOSM:
             # Une voiture rangée sur le côté ralentit pour laisser doubler.
             # Elle reprend sa vitesse dès que l'urgence l'a dépassée.
             if (voiture in self.__cedent_urgence
-                    and voiture.get_decalage() >= 7):
+                    and voiture.get_decalage() >= 7
+                    and not self.__pres_intersection(voiture, 48)):
                 vitesse = min(vitesse, 0.7)
             cible = min(voiture.get_longueur(), ancien + vitesse)
             cible, a_reserver = self.__controle_intersections(voiture, cible)
@@ -867,6 +913,11 @@ class SimulationReseauOSM:
         self.__agents = [v for v in self.__agents if v.get_avancement() < v.get_longueur() - 1]
         self.__immobilisation = {
             v: self.__immobilisation.get(v, 0) for v in self.__agents
+        }
+        # Ne pas conserver de référence aux véhicules sortis de la simulation.
+        self.__cedent_memo = {
+            v: suivis for v, suivis in self.__cedent_memo.items()
+            if v in self.__agents
         }
 
         # Filet de sécurité pour un interblocage qui dure plus de 18 secondes.
