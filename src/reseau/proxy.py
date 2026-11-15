@@ -14,9 +14,11 @@ from src.reseau.client import ClientReseau
 class ObjetDistant:
     """Expose les getters existants des modèles graphiques sans moteur local."""
     def __init__(self, valeurs: dict[str, Any] | None = None) -> None:
+        """Initialise l'objet et ses attributs."""
         self.__valeurs: dict[str, Any] = valeurs or {}
 
     def __getattr__(self, nom: str) -> Callable[[], Any]:
+        """Exécute le traitement « getattr »."""
         if nom.startswith("get_"):
             cle = nom[4:]
             if cle in self.__valeurs:
@@ -56,6 +58,7 @@ class SimulationDistante(QObject):
     reponse_urgence = pyqtSignal(str)
 
     def __init__(self, largeur: int, hauteur: int) -> None:
+        """Initialise l'objet et ses attributs."""
         super().__init__()
         self.__verrou = threading.Lock()
         self.__dernier_etat: dict[str, Any] = etat_vide()
@@ -68,10 +71,12 @@ class SimulationDistante(QObject):
         self.__reseau.arreter()
 
     def __recevoir_etat(self, etat: dict[str, Any]) -> None:
+        """Exécute le traitement « recevoir etat »."""
         with self.__verrou:
             self.__dernier_etat = etat
 
     def __recevoir_reponse(self, message: dict[str, Any]) -> None:
+        """Exécute le traitement « recevoir reponse »."""
         if message.get("type") == "deconnexion":
             self.reponse_urgence.emit("Serveur déconnecté : nouvelle recherche en cours")
         elif message.get("ok"):
@@ -108,6 +113,7 @@ class SimulationDistante(QObject):
         return ParkingDistant(self.__etat_affiche["parking"])
 
     def creer_urgence(self, type_urgence: str, niveau_priorite: int, vehicules: list[VehiculeUrgence]) -> None:
+        """Crée le traitement « creer urgence »."""
         self.__reseau.envoyer_urgence(type_urgence, niveau_priorite, vehicules)
         return None
 
