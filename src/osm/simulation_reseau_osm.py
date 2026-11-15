@@ -324,17 +324,22 @@ class SimulationReseauOSM:
         # On limite les recherches de Dijkstra pour ne pas interrompre
         # trop longtemps le serveur avec les grandes cartes.
         # Si le premier groupe ne suffit pas, on élargit une fois.
+        avant_cache = {}
         sortie_cache = {}
         for maximum in (12, 36):
-            for debut in entrees[:maximum]:
-                avant = self.__reseau.dijkstra(debut, self.__centre_id)
-                if not avant or len(avant) < 2:
+            # Chercher d'abord le bon sens de sortie pour toutes les
+            # provenances candidates. Le repli sert uniquement à
+            # "tout droit" si la géométrie est trop tortueuse.
+            for tout_droit_souple in (False, True):
+                if souhaite is not None and tout_droit_souple:
                     continue
-                # Si tout droit est demandé, privilégier une sortie dans
-                # le prolongement du trajet. Une route tortueuse peut
-                # nécessiter un repli lorsqu'aucun axe rectiligne n'existe.
-                for tout_droit_souple in (False, True):
-                    if souhaite is not None and tout_droit_souple:
+                for debut in entrees[:maximum]:
+                    if debut not in avant_cache:
+                        avant_cache[debut] = self.__reseau.dijkstra(
+                            debut, self.__centre_id
+                        )
+                    avant = avant_cache[debut]
+                    if not avant or len(avant) < 2:
                         continue
                     for fin in sorties[:maximum]:
                         if debut == fin:
