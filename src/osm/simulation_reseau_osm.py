@@ -685,7 +685,9 @@ class SimulationReseauOSM:
                 # NE JAMAIS rappeler vers la voie un véhicule déjà rangé.
                 if voiture.get_decalage() > 0 or not self.__pres_intersection(voiture):
                     voiture.ajuster_decalage(10.0)
-            elif voiture.get_decalage() > 0 and self.__retour_possible(voiture):
+            elif (voiture.get_decalage() > 0
+                  and not self.__pres_intersection(voiture)
+                  and self.__retour_possible(voiture)):
                 voiture.ajuster_decalage(0.0)
 
     def __priorites(self):

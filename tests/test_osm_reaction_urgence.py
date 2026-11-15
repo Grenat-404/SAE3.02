@@ -103,12 +103,22 @@ class ReactionUrgenceOSMTests(unittest.TestCase):
         for _ in range(15):
             sim._SimulationReseauOSM__reagir_aux_urgences()
         decalage = normale.get_decalage()
-        # La voiture ne se trouve plus sur le même tronçon : le mémoriser
-        # jusqu'à ce que l'ambulance passe l'endroit où elle s'est rangée.
-        sim._SimulationReseauOSM__cedent_memo = {normale: {urgence: 70.0}}
+        # Après le virage de la rue horizontale vers la verticale,
+        # les nœuds parcourus ne sont plus ceux de l'ambulance.
+        positions = sim._SimulationReseauOSM__positions
+        normale.changer_chemin(
+            ["12", "13", "24", "35", "46"], positions
+        )
         normale.set_avancement(normale.distance_noeud(1) + 4)
+        sim._SimulationReseauOSM__cedent_memo = {normale: {urgence: 70.0}}
         sim._SimulationReseauOSM__reagir_aux_urgences()
         self.assertGreaterEqual(normale.get_decalage(), decalage)
+        self.assertIn(normale, sim._SimulationReseauOSM__cedent_urgence)
+        urgence.set_avancement(200)
+        # Une fois l'ambulance passée, le retour ne doit pas se faire
+        # directement au carrefour, même si le chemin a changé.
+        sim._SimulationReseauOSM__reagir_aux_urgences()
+        self.assertNotIn(normale, sim._SimulationReseauOSM__cedent_urgence)
 
     def test_retour_attend_place_libre(self):
         sim, normale, urgence = self.preparer()
