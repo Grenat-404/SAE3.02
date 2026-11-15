@@ -56,7 +56,6 @@ python3 -m compileall -q lancer_osm.py src tests
 python3 -m unittest discover -s tests -p "test_*.py"
 ```
 
-Voir [GUIDE_OSM.md](GUIDE_OSM.md) pour les détails de fonctionnement.
 
 ## Base de données (SQLite)
 
