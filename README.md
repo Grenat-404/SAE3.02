@@ -57,3 +57,30 @@ python3 -m unittest discover -s tests -p "test_*.py"
 ```
 
 Voir [GUIDE_OSM.md](GUIDE_OSM.md) pour les détails de fonctionnement.
+
+## Base de données (SQLite)
+
+Le **serveur** crée automatiquement `data/statistiques.db` lors de la première
+connexion du client. Aucune installation supplémentaire n'est nécessaire.
+
+Trois tables sont créées :
+- `simulations` : début/fin, mode classique ou OSM, carte et carrefour choisis ;
+- `statistiques` : durée, maximum et moyenne des véhicules présents, nombre
+  de demandes d'urgence (une ligne par simulation **terminée**) ;
+- `urgences` : historique des demandes acceptées, priorité et nombre de véhicules.
+
+Une nouvelle simulation est enregistrée au démarrage, après un changement de
+carte et après une réinitialisation. Les résultats sont écrits à la fin de
+chaque simulation (arrêt normal, changement de carte ou réinitialisation).
+En cas d'arrêt brutal du processus, la ligne de simulation peut rester ouverte.
+La base reste exclusivement sur la VM serveur ; le client n'a aucun accès
+direct au fichier. Les fichiers `.db` ne sont pas envoyés sur GitHub.
+
+Pour consulter les résultats sur la VM serveur avec l'outil `sqlite3` :
+
+```bash
+sqlite3 -header -column data/statistiques.db "SELECT * FROM simulations;"
+sqlite3 -header -column data/statistiques.db "SELECT * FROM statistiques;"
+sqlite3 -header -column data/statistiques.db "SELECT * FROM urgences;"
+```
+

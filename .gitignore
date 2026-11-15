@@ -12,3 +12,6 @@ __pycache__/
 # Fichiers système
 .DS_Store
 Thumbs.db
+
+# Base SQLite locale (serveur uniquement)
+data/*.db*

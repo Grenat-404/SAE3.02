@@ -8,6 +8,7 @@ import base64
 import json
 import re
 import threading
+import time
 import zlib
 from typing import Any, cast
 from src.reseau.protocole import VehiculeUrgence, EtatVehiculeOSM, MoteurSimulation
@@ -17,6 +18,7 @@ from src.reseau import serveur as serveur_original
 from src.reseau.protocole import encoder
 from src.simulation.simulation import Simulation
 from src.osm.simulation_reseau_osm import SimulationReseauOSM
+from src.statistiques import BaseStatistiques
 
 class SimulationAvecOSM:
     """Aiguillage entre le carrefour d'origine et le moteur multicarrefours."""
@@ -32,6 +34,46 @@ class SimulationAvecOSM:
         self.__plan: dict[str, Any] | None = None
         self.__plan_zip: str | None = None
         self.__numero_image = 0
+
+        # La base appartient au serveur, jamais au client.
+        self.__bdd = BaseStatistiques()
+        self.__simulation_id: int | None = None
+        self.__debut = 0.0
+        self.__somme_vehicules = 0
+        self.__nombre_releves = 0
+        self.__maximum_vehicules = 0
+        self.__nombre_urgences = 0
+        self.__demarrer_statistiques()
+
+    def __observer_vehicules(self) -> None:
+        nombre = len(self.__moteur.get_vehicules())
+        self.__somme_vehicules += nombre
+        self.__nombre_releves += 1
+        self.__maximum_vehicules = max(self.__maximum_vehicules, nombre)
+
+    def __demarrer_statistiques(self) -> None:
+        self.__simulation_id = self.__bdd.nouvelle_simulation(
+            "classique" if self.__carte is None else "osm",
+            self.__carte, self.__centre
+        )
+        self.__debut = time.monotonic()
+        self.__somme_vehicules = 0
+        self.__nombre_releves = 0
+        self.__maximum_vehicules = 0
+        self.__nombre_urgences = 0
+        self.__observer_vehicules()
+
+    def __terminer_statistiques(self) -> None:
+        if self.__simulation_id is None:
+            return
+        duree = time.monotonic() - self.__debut
+        moyenne = (self.__somme_vehicules / self.__nombre_releves
+                   if self.__nombre_releves else 0.0)
+        self.__bdd.terminer_simulation(
+            self.__simulation_id, duree, self.__maximum_vehicules,
+            moyenne, self.__nombre_urgences
+        )
+        self.__simulation_id = None
 
     # Partie principale : traitement principal
     def changer_carte(self, carte: str | None, centre: str | None) -> None:
@@ -57,7 +99,9 @@ class SimulationAvecOSM:
                 plan_zip = base64.b64encode(zlib.compress(plan_json, 3)).decode("ascii")
                 selection = carte + ":" + str(centre)
 
+            # Le nouveau moteur est prêt : terminer l'ancienne session.
             ancien = self.__moteur
+            self.__terminer_statistiques()
             self.__moteur = nouveau
             self.__carte = carte
             self.__centre = centre
@@ -65,6 +109,7 @@ class SimulationAvecOSM:
             self.__plan = plan
             self.__plan_zip = plan_zip
             self.__numero_image = 0
+            self.__demarrer_statistiques()
             if hasattr(ancien, "arreter"):
                 ancien.arreter()
             print("[SERVEUR] Simulation :", selection, flush=True)
@@ -76,10 +121,20 @@ class SimulationAvecOSM:
     def avancer(self) -> None:
         with self.__verrou:
             self.__moteur.avancer()
+            # Comptage léger en mémoire (aucune écriture SQL à chaque tick).
+            self.__observer_vehicules()
 
     def creer_urgence(self, type_urgence: str, niveau_priorite: int, vehicules: list[VehiculeUrgence]) -> int:
         with self.__verrou:
-            return self.__moteur.creer_urgence(type_urgence, niveau_priorite, vehicules)
+            identifiant = self.__moteur.creer_urgence(
+                type_urgence, niveau_priorite, vehicules
+            )
+            # Une demande peut contenir plusieurs véhicules prioritaires.
+            self.__bdd.enregistrer_urgence(
+                self.__simulation_id, type_urgence, niveau_priorite, len(vehicules)
+            )
+            self.__nombre_urgences += 1
+            return identifiant
 
     # Partie principale : traitement principal
     def exporter_etat_reseau(self) -> dict[str, Any]:
@@ -120,8 +175,11 @@ class SimulationAvecOSM:
 
     def arreter(self) -> None:
         with self.__verrou:
-            if hasattr(self.__moteur, "arreter"):
-                self.__moteur.arreter()
+            try:
+                self.__terminer_statistiques()
+            finally:
+                if hasattr(self.__moteur, "arreter"):
+                    self.__moteur.arreter()
 
 
 class SessionClientAvecOSM(serveur_original.SessionClient):
