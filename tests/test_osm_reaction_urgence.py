@@ -15,7 +15,9 @@ CARTE = Path(__file__).resolve().parents[1] / "data" / "maps" / "demo_grille_mul
 
 
 class ReactionUrgenceOSMTests(unittest.TestCase):
+    """Représente ReactionUrgenceOSMTests dans l'application."""
     def preparer(self):
+        """Exécute le traitement « preparer »."""
         reseau = ReseauRoutier(str(CARTE))
         centre = reseau.carrefours()[0]["id"]
         sim = SimulationReseauOSM(str(CARTE), centre, 1440, 900, graine=8)
@@ -29,6 +31,7 @@ class ReactionUrgenceOSMTests(unittest.TestCase):
         return sim, normale, urgence
 
     def test_une_voiture_devant_se_decale_rapidement(self):
+        """Exécute le traitement « test une voiture devant se decale rapidement »."""
         sim, normale, urgence = self.preparer()
         sim._SimulationReseauOSM__reagir_aux_urgences()
         self.assertGreater(normale.get_decalage(), 0)
@@ -40,6 +43,7 @@ class ReactionUrgenceOSMTests(unittest.TestCase):
         self.assertIn(normale, sim._SimulationReseauOSM__cedent_urgence)
 
     def test_retour_progressif_apres_urgence(self):
+        """Exécute le traitement « test retour progressif apres urgence »."""
         sim, normale, _ = self.preparer()
         for _ in range(20):
             sim._SimulationReseauOSM__reagir_aux_urgences()
@@ -52,6 +56,7 @@ class ReactionUrgenceOSMTests(unittest.TestCase):
         self.assertEqual(normale.get_decalage(), 0)
 
     def test_detour_ne_teleporte_pas_le_vehicule(self):
+        """Exécute le traitement « test detour ne teleporte pas le vehicule »."""
         sim, normale, urgence = self.preparer()
         avant = normale.position()
         chemin_initial = list(normale.get_chemin())
@@ -68,6 +73,7 @@ class ReactionUrgenceOSMTests(unittest.TestCase):
         self.assertEqual(urgence.get_chemin(), chemin_initial)
 
     def test_detour_avant_rejoindre_la_route_urgence(self):
+        """Exécute le traitement « test detour avant rejoindre la route urgence »."""
         sim, _, _ = self.preparer()
         positions = sim._SimulationReseauOSM__positions
         urgence_nodes = ["13", "14", "15", "16", "17"]
@@ -88,6 +94,7 @@ class ReactionUrgenceOSMTests(unittest.TestCase):
         self.assertEqual(normale.get_chemin()[-1], "17")
 
     def test_garde_son_decalage_au_carrefour(self):
+        """Exécute le traitement « test garde son decalage au carrefour »."""
         sim, normale, urgence = self.preparer()
         for _ in range(18):
             sim._SimulationReseauOSM__reagir_aux_urgences()
@@ -99,6 +106,7 @@ class ReactionUrgenceOSMTests(unittest.TestCase):
         self.assertIn(normale, sim._SimulationReseauOSM__cedent_urgence)
 
     def test_garde_decalage_apres_changement_de_route(self):
+        """Exécute le traitement « test garde decalage apres changement de route »."""
         sim, normale, urgence = self.preparer()
         for _ in range(15):
             sim._SimulationReseauOSM__reagir_aux_urgences()
@@ -117,6 +125,7 @@ class ReactionUrgenceOSMTests(unittest.TestCase):
         self.assertNotIn(normale, sim._SimulationReseauOSM__cedent_urgence)
 
     def test_retour_attend_place_libre(self):
+        """Exécute le traitement « test retour attend place libre »."""
         sim, normale, urgence = self.preparer()
         for _ in range(18):
             sim._SimulationReseauOSM__reagir_aux_urgences()
@@ -132,6 +141,7 @@ class ReactionUrgenceOSMTests(unittest.TestCase):
         self.assertLess(normale.get_decalage(), decalage)
 
     def test_autre_route_aucun_ecartement(self):
+        """Exécute le traitement « test autre route aucun ecartement »."""
         sim, normale, urgence = self.preparer()
         sim._SimulationReseauOSM__agents = [normale]
         sim._SimulationReseauOSM__reagir_aux_urgences()
